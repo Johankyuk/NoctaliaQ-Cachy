@@ -32,6 +32,11 @@ if flatpak info org.vinegarhq.Sober &>/dev/null || flatpak info io.mrarm.mcpelau
   flatpak install --user -y flathub org.freedesktop.Platform.VulkanLayer.MangoHud//25.08 || true
   flatpak override --user --filesystem=xdg-config/MangoHud:ro
   if flatpak info org.vinegarhq.Sober &>/dev/null; then
+    # Sober renderiza por Vulkan: no necesita LD_PRELOAD/MANGOHUD_DLSYM, el layer implícito ya lo cubre.
+    # device=input y el filesystem de Discord IPC sí son necesarios (los pide el propio Sober al abrir).
+    flatpak override --user --device=input org.vinegarhq.Sober
+    flatpak override --user --filesystem=xdg-run/app/com.discordapp.Discord:create org.vinegarhq.Sober
+    flatpak override --user --filesystem=xdg-run/discord-ipc-0 org.vinegarhq.Sober
     flatpak override --user --env=MANGOHUD=1 org.vinegarhq.Sober
   fi
   if flatpak info io.mrarm.mcpelauncher &>/dev/null; then
