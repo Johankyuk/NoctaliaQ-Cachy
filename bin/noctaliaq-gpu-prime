@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # noctaliaq-gpu-prime — activa/desactiva el estado de PRIME offload.
 # El estado lo lee noctaliaq-gpu-launch en cada lanzamiento del launcher.
+# También dispara noctaliaq-gpu-flatpak-sync acá mismo (no via array de hooks):
+# Noctalia solo ejecuta el primer ítem de un array en hooks battery_*, a diferencia
+# de colors_changed que sí corre todos — así que se encadena a mano en vez de confiar en eso.
 set -u
 STATE=~/.local/state/noctaliaq/gpu-prime-state
 case "${1:-}" in
@@ -8,3 +11,4 @@ case "${1:-}" in
   off) echo "off" > "$STATE"; logger -t noctaliaq-gpu-prime "PRIME offload desactivado (bateria)" ;;
   *) echo "uso: noctaliaq-gpu-prime [on|off]" >&2; exit 1 ;;
 esac
+~/.local/bin/noctaliaq-gpu-flatpak-sync
