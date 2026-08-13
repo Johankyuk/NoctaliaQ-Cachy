@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# mangohud-color-sync — sincroniza colores de identidad de MangoHud con accent_color de Noctalia (sin boost).
+# Disparado por el hook nativo colors_changed (ver ~/.config/noctalia/kbd-color-sync.toml).
+set -uo pipefail
+CSS="$HOME/.config/gtk-4.0/noctalia.css"
+CONF="$HOME/.config/MangoHud/MangoHud.conf"
+[ -r "$CSS" ] || { echo "no encontré $CSS" >&2; exit 1; }
+[ -w "$CONF" ] || { echo "sin permiso de escritura en $CONF" >&2; exit 1; }
+hex=$(grep -oP '(?<=@define-color accent_color )#[0-9a-fA-F]{6}' "$CSS" | head -1)
+[ -n "$hex" ] || { echo "no pude leer accent_color de $CSS" >&2; exit 1; }
+hex_upper=$(echo "${hex#\#}" | tr '[:lower:]' '[:upper:]')
+cp "$CONF" "$CONF.bak.$(date +%s)"
+sed -i -E \
+  -e "s/^gpu_color=.*/gpu_color=${hex_upper}/" \
+  -e "s/^vram_color=.*/vram_color=${hex_upper}/" \
+  -e "s/^cpu_color=.*/cpu_color=${hex_upper}/" \
+  -e "s/^ram_color=.*/ram_color=${hex_upper}/" \
+  -e "s/^frametime_color=.*/frametime_color=${hex_upper}/" \
+  "$CONF"
+echo "mangohud-color-sync: accent #${hex_upper} -> gpu/vram/cpu/ram/frametime"

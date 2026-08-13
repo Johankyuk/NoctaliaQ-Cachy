@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# noctaliaq-gpu-prime — activa/desactiva el estado de PRIME offload.
+# El estado lo lee noctaliaq-gpu-launch en cada lanzamiento del launcher.
+set -u
+STATE=~/.local/state/noctaliaq/gpu-prime-state
+case "${1:-}" in
+  on)  echo "on"  > "$STATE"; logger -t noctaliaq-gpu-prime "PRIME offload activado (AC)" ;;
+  off) echo "off" > "$STATE"; logger -t noctaliaq-gpu-prime "PRIME offload desactivado (bateria)" ;;
+  *) echo "uso: noctaliaq-gpu-prime [on|off]" >&2; exit 1 ;;
+esac

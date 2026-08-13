@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# kbd-color-sync — sincroniza el RGB del teclado con el accent_color de Noctalia (paleta del wallpaper).
+# Disparado por el hook nativo colors_changed (ver ~/.config/noctalia/kbd-color-sync.toml).
+# Uso: kbd-color-sync [--sat=MULT] [--val=FLOOR] [--raw]
+#   --raw es shorthand de --sat=1.0 --val=0.0 (color crudo del accent, sin ajuste).
+set -uo pipefail
+CSS="$HOME/.config/gtk-4.0/noctalia.css"
+LED_MODE=/sys/class/leds/asus::kbd_backlight/kbd_rgb_mode
+SAT=1.6
+VAL=0.85
+for arg in "$@"; do
+  case "$arg" in
+    --raw) SAT=1.0; VAL=0.0 ;;
+    --sat=*) SAT="${arg#--sat=}" ;;
+    --val=*) VAL="${arg#--val=}" ;;
+  esac
+done
+[ -r "$CSS" ] || { echo "no encontré $CSS" >&2; exit 1; }
+[ -w "$LED_MODE" ] || { echo "sin permiso de escritura en $LED_MODE" >&2; exit 1; }
+hex=$(grep -oP '(?<=@define-color accent_color )#[0-9a-fA-F]{6}' "$CSS" | head -1)
+[ -n "$hex" ] || { echo "no pude leer accent_color de $CSS" >&2; exit 1; }
+hex="${hex#\#}"
+read -r r g b <<< "$(python3 -c "
+import colorsys
+h='$hex'
+r,g,b=(int(h[i:i+2],16) for i in (0,2,4))
+hh,s,v=colorsys.rgb_to_hsv(r/255,g/255,b/255)
+s=min(1.0, s*$SAT)
+v=max(v, $VAL)
+r2,g2,b2=colorsys.hsv_to_rgb(hh,s,v)
+print(f'{round(r2*255)} {round(g2*255)} {round(b2*255)}')
+")"
+echo "1 0 $r $g $b 0" > "$LED_MODE"
+echo "kbd-color-sync: accent #$hex -> rgb($r,$g,$b) [sat=$SAT val=$VAL]"

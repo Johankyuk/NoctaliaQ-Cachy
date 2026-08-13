@@ -1,0 +1,3 @@
+[shell]
+polkit_agent = true
+launch_apps_custom_command = "noctaliaq-gpu-launch $CMD"
