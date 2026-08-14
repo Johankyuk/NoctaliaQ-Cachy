@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# noctaliaq-gpu-flatpak-sync — oculta/muestra el ICD de NVIDIA a apps flatpak Vulkan-nativas
+# según el estado de PRIME offload. Necesario porque flatpak no hereda env vars del host:
+# hay que setearlas vía `flatpak override --env=`, no alcanza con exportarlas antes del exec.
+set -uo pipefail
+STATE=~/.local/state/noctaliaq/gpu-prime-state
+APPS=(org.vinegarhq.Sober)
+if [[ -f "$STATE" ]] && [[ "$(cat "$STATE")" == "on" ]]; then
+    for app in "${APPS[@]}"; do
+        flatpak override --user --unset-env=VK_ICD_FILENAMES "$app" 2>/dev/null
+    done
+    logger -t noctaliaq-gpu-flatpak-sync "ICD NVIDIA visible para flatpaks (AC)"
+else
+    for app in "${APPS[@]}"; do
+        flatpak override --user --env=VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/radeon_icd.json "$app"
+    done
+    logger -t noctaliaq-gpu-flatpak-sync "ICD NVIDIA oculto para flatpaks (bateria)"
+fi
