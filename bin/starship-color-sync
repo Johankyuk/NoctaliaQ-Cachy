@@ -1,36 +1,34 @@
 #!/usr/bin/env bash
-# starship-color-sync — recolorea toda la barra en tonos del accent_color de Noctalia.
-# Los 4 tiers "de módulo" (dir/git/lang/docker) se detectan por ancla y se propagan por
-# valor. Las 5 flechas y las 2 cápsulas se reescriben por POSICIÓN ESTRUCTURAL fija,
+# starship-color-sync — recolorea toda la barra con primary/secondary/tertiary de Noctalia.
+# Bloques de 2 paradas por rol: primary(user,dir) secondary(git,lang) tertiary(docker,time).
+# Las 5 flechas y las 2 cápsulas se reescriben por POSICIÓN ESTRUCTURAL fija,
 # nunca por el valor que tuvieran antes — así no se desincronizan entre corridas.
 set -uo pipefail
-CSS="$HOME/.config/gtk-4.0/noctalia.css"
+PALETTE="$HOME/.cache/noctalia/palette-raw.conf"
 CONF="$HOME/.config/starship.toml"
-[ -r "$CSS" ] || { echo "no encontré $CSS" >&2; exit 1; }
+[ -r "$PALETTE" ] || { echo "no encontré $PALETTE" >&2; exit 1; }
 [ -w "$CONF" ] || { echo "sin permiso de escritura en $CONF" >&2; exit 1; }
-hex=$(grep -oP '(?<=@define-color accent_color )#[0-9a-fA-F]{6}' "$CSS" | head -1)
-[ -n "$hex" ] || { echo "no pude leer accent_color de $CSS" >&2; exit 1; }
-hex_upper=$(echo "${hex#\#}" | tr '[:lower:]' '[:upper:]')
-cp "$CONF" "$CONF.bak.$(date +%s)"
-python3 - "$CONF" "$hex_upper" <<'PYEOF'
-import re, sys, pathlib, colorsys
 
-conf, accent = sys.argv[1], sys.argv[2]
+primary=$(grep -oP '(?<=^primary=)#[0-9a-fA-F]{6}' "$PALETTE" | head -1)
+secondary=$(grep -oP '(?<=^secondary=)#[0-9a-fA-F]{6}' "$PALETTE" | head -1)
+tertiary=$(grep -oP '(?<=^tertiary=)#[0-9a-fA-F]{6}' "$PALETTE" | head -1)
+[ -n "$primary" ] && [ -n "$secondary" ] && [ -n "$tertiary" ] || { echo "no pude leer primary/secondary/tertiary de $PALETTE" >&2; exit 1; }
+
+primary_upper=$(echo "${primary#\#}" | tr '[:lower:]' '[:upper:]')
+secondary_upper=$(echo "${secondary#\#}" | tr '[:lower:]' '[:upper:]')
+tertiary_upper=$(echo "${tertiary#\#}" | tr '[:lower:]' '[:upper:]')
+
+cp "$CONF" "$CONF.bak.$(date +%s)"
+
+python3 - "$CONF" "$primary_upper" "$secondary_upper" "$tertiary_upper" <<'PYEOF'
+import re, sys, pathlib
+
+conf, primary, secondary, tertiary = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
 p = pathlib.Path(conf)
 text = p.read_text()
 
-r = int(accent[0:2], 16) / 255
-g = int(accent[2:4], 16) / 255
-b = int(accent[4:6], 16) / 255
-h, s, v = colorsys.rgb_to_hsv(r, g, b)
-
-def tone(v_mult):
-    vv = min(1.0, v * v_mult)
-    rr, gg, bb = colorsys.hsv_to_rgb(h, s, vv)
-    return f"{round(rr*255):02X}{round(gg*255):02X}{round(bb*255):02X}"
-
 t_user, t_dir, t_git, t_lang, t_dock, t_time = (
-    tone(0.55), tone(0.68), tone(0.80), tone(0.90), tone(0.95), accent
+    primary, primary, secondary, secondary, tertiary, tertiary
 )
 
 def sync_home(pattern, new_val):
@@ -64,4 +62,4 @@ text = re.sub(r'^\[ \]\(fg:#[0-9A-Fa-f]{6}\)\\$',
 p.write_text(text)
 print(f"paleta: user=#{t_user} dir=#{t_dir} git=#{t_git} lang=#{t_lang} docker=#{t_dock} time=#{t_time}")
 PYEOF
-echo "starship-color-sync: accent #${hex_upper} -> paleta completa + flechas aplicadas"
+echo "starship-color-sync: primary=#${primary_upper} secondary=#${secondary_upper} tertiary=#${tertiary_upper} -> paleta + flechas aplicadas"
