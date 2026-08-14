@@ -18,6 +18,7 @@ gsettings set org.gnome.desktop.interface cursor-size 32 2>/dev/null || true
 
 echo "== Config Noctalia =="
 backup_and_copy "$REPO_DIR/config/noctalia/config.toml" "$HOME/.config/noctalia/config.toml"
+backup_and_copy "$REPO_DIR/config/noctalia/kbd-color-sync.toml" "$HOME/.config/noctalia/kbd-color-sync.toml"
 
 echo "== MangoHud (paquete + config) =="
 if ! pacman -Qi mangohud &>/dev/null; then

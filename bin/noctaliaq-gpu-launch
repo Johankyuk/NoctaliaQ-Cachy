@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # noctaliaq-gpu-launch — wrapper para launch_apps_custom_command.
-# Si el estado es "on", antepone las vars de PRIME offload al comando real.
+# Si el estado es "on", antepone las vars de PRIME offload (OpenGL) al comando real.
+# Si es "off", además oculta el ICD de NVIDIA del loader Vulkan (VK_ICD_FILENAMES),
+# porque apps Vulkan-nativas (ej. Sober) ignoran las vars de PRIME/GLX y eligen
+# la dGPU por su cuenta si el loader se la deja ver.
 STATE=~/.local/state/noctaliaq/gpu-prime-state
 if [[ -f "$STATE" ]] && [[ "$(cat "$STATE")" == "on" ]]; then
     exec env __NV_PRIME_RENDER_OFFLOAD=1 \
@@ -9,5 +12,6 @@ if [[ -f "$STATE" ]] && [[ "$(cat "$STATE")" == "on" ]]; then
              DRI_PRIME=1 \
              "$@"
 else
-    exec "$@"
+    exec env VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/radeon_icd.json \
+             "$@"
 fi
