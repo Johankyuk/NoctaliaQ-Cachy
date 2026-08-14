@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
-# starship-color-sync — recolorea TODA la barra de starship en tonos del accent_color de Noctalia
-# (mismo hue, value progresivo oscuro->claro por segmento). Disparado por colors_changed.
+# starship-color-sync — recolorea toda la barra en tonos del accent_color de Noctalia.
+# Los 4 tiers "de módulo" (dir/git/lang/docker) se detectan por ancla y se propagan por
+# valor. Las 5 flechas y las 2 cápsulas se reescriben por POSICIÓN ESTRUCTURAL fija,
+# nunca por el valor que tuvieran antes — así no se desincronizan entre corridas.
 set -uo pipefail
 CSS="$HOME/.config/gtk-4.0/noctalia.css"
 CONF="$HOME/.config/starship.toml"
@@ -28,29 +30,38 @@ def tone(v_mult):
     return f"{round(rr*255):02X}{round(gg*255):02X}{round(bb*255):02X}"
 
 t_user, t_dir, t_git, t_lang, t_dock, t_time = (
-    tone(0.55), tone(0.68), tone(0.80), tone(0.90), tone(1.00), accent
+    tone(0.55), tone(0.68), tone(0.80), tone(0.90), tone(0.95), accent
 )
 
-m_dir  = re.search(r'\[directory\]\nstyle = "bg:(#[0-9A-Fa-f]{6})"', text)
-m_git  = re.search(r'\[git_branch\][^\[]*?style = "bg:(#[0-9A-Fa-f]{6})"', text, re.S)
-m_lang = re.search(r'\[c\]\nsymbol[^\n]*\nstyle = "bg:(#[0-9A-Fa-f]{6})"', text)
-m_dock = re.search(r'\[docker_context\][^\[]*?style = "bg:(#[0-9A-Fa-f]{6})"', text, re.S)
-assert m_dir and m_git and m_lang and m_dock, "no encontré alguno de los anchors de color"
-old_dir, old_git, old_lang, old_dock = m_dir.group(1), m_git.group(1), m_lang.group(1), m_dock.group(1)
+def sync_home(pattern, new_val):
+    global text
+    m = re.search(pattern, text, re.S)
+    assert m, f"no encontré ancla: {pattern}"
+    text = text.replace(m.group(1), f"#{new_val}")
 
-# username/time: por campo, no por valor (ya pueden coincidir entre sí)
-text = re.sub(r'(style_user = "bg:)#[0-9A-Fa-f]{6}(")', rf'\1#{t_user}\2', text)
-text = re.sub(r'(style_root = "bg:)#[0-9A-Fa-f]{6}(")', rf'\1#{t_user}\2', text)
-text = re.sub(r'(\[\]\()#[0-9A-Fa-f]{6}(\))', rf'\1#{t_user}\2', text, count=1)
-text = re.sub(r'(\[time\].*?style = "bg:)#[0-9A-Fa-f]{6}(")', rf'\1#{t_time}\2', text, flags=re.S)
+sync_home(r'style_user = "bg:(#[0-9A-Fa-f]{6})"', t_user)
+sync_home(r'\[directory\]\nstyle = "bg:(#[0-9A-Fa-f]{6})"', t_dir)
+sync_home(r'\[git_branch\][^\[]*?style = "bg:(#[0-9A-Fa-f]{6})"', t_git)
+sync_home(r'\[git_status\]\nstyle = "bg:(#[0-9A-Fa-f]{6})"', t_git)
+sync_home(r'\[c\]\nsymbol[^\n]*\nstyle = "bg:(#[0-9A-Fa-f]{6})"', t_lang)
+sync_home(r'\[docker_context\][^\[]*?style = "bg:(#[0-9A-Fa-f]{6})"', t_dock)
+text = re.sub(r'(\[time\][^\[]*?style = "bg:)#[0-9A-Fa-f]{6}(")',
+              lambda m: f'{m.group(1)}#{t_time}{m.group(2)}', text, flags=re.S)
 
-# resto: valores únicos todavía, replace directo cubre también las flechas
-text = text.replace(old_dir, f"#{t_dir}")
-text = text.replace(old_git, f"#{t_git}")
-text = text.replace(old_lang, f"#{t_lang}")
-text = text.replace(old_dock, f"#{t_dock}")
+# --- flechas y cápsulas: reescritura estructural, no depende de valores viejos ---
+text = re.sub(r'^\[\]\(#[0-9A-Fa-f]{6}\)\\$',
+              lambda m: f'[](#{t_user})\\', text, count=1, flags=re.M)
+text = re.sub(r'^\[\]\(bg:#[0-9A-Fa-f]{6} fg:#[0-9A-Fa-f]{6}\)\\$',
+              lambda m: f'[](bg:#{t_dir} fg:#{t_user})\\', text, count=1, flags=re.M)
+seq = iter([(t_dir, t_git), (t_git, t_lang), (t_lang, t_dock), (t_dock, t_time)])
+def repl_arrow(m):
+    fg, bg = next(seq)
+    return f'[](fg:#{fg} bg:#{bg})\\'
+text = re.sub(r'^\[\]\(fg:#[0-9A-Fa-f]{6} bg:#[0-9A-Fa-f]{6}\)\\$', repl_arrow, text, flags=re.M)
+text = re.sub(r'^\[ \]\(fg:#[0-9A-Fa-f]{6}\)\\$',
+              lambda m: f'[ ](fg:#{t_time})\\', text, count=1, flags=re.M)
 
 p.write_text(text)
 print(f"paleta: user=#{t_user} dir=#{t_dir} git=#{t_git} lang=#{t_lang} docker=#{t_dock} time=#{t_time}")
 PYEOF
-echo "starship-color-sync: accent #${hex_upper} -> paleta completa aplicada"
+echo "starship-color-sync: accent #${hex_upper} -> paleta completa + flechas aplicadas"

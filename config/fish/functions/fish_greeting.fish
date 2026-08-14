@@ -1,4 +1,12 @@
 function fish_greeting
-    random choice \
-        "Don't Give Up... The Best Is Yet To Come"
+    set -l marker "/tmp/.horus_greeting_shown_$USER"
+    if test -f "$marker"
+        return
+    end
+    touch "$marker"
+    printf '%s\n' \
+        '_____ _          ___         _     ___     __   __   _     _____       ___               ' \
+        ' |_   _| |_  ___  | _ ) ___ __| |_  |_ _|___ \\ \\ / /__| |_  |_   _|__   / __|___ _ __  ___ ' \
+        '   | | | \' \\/ -_) | _ \\/ -_|_-<  _|  | |(_-<  \\ V / -_)  _|   | |/ _ \\ | (__/ _ \\ \'  \\/ -_)' \
+        '   |_| |_||_\\___| |___/\\___/__/\\__| |___/__/   |_|\\___|\\__|   |_|\\___/  \\___\\___/_|_|_\\___|'
 end
