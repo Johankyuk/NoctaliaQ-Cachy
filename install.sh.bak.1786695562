@@ -58,16 +58,6 @@ for f in "$REPO_DIR"/config/niri/cfg/*.kdl; do
   backup_and_copy "$f" "$HOME/.config/niri/cfg/$(basename "$f")"
 done
 
-echo "== Fish (config + greeting) =="
-backup_and_copy "$REPO_DIR/config/fish/config.fish" "$HOME/.config/fish/config.fish"
-backup_and_copy "$REPO_DIR/config/fish/functions/fish_greeting.fish" "$HOME/.config/fish/functions/fish_greeting.fish"
-
-echo "== Kitty (config + tema Noctalia) =="
-backup_and_copy "$REPO_DIR/config/kitty" "$HOME/.config/kitty"
-
-echo "== niri config.kdl (window-rules, blur) =="
-backup_and_copy "$REPO_DIR/config/niri/config.kdl" "$HOME/.config/niri/config.kdl"
-
 echo "== Scripts .local/bin =="
 mkdir -p "$HOME/.local/bin"
 for f in "$REPO_DIR"/bin/*; do
