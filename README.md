@@ -14,5 +14,15 @@ git clone git@github.com:Johankyuk/NoctaliaQ-Cachy.git && cd NoctaliaQ-Cachy && 
 - `config/MangoHud/MangoHud.conf`
 - `config/alacritty/` — alacritty.toml + tema dinámico Noctalia.
 - `config/niri/cfg/` — todos los `.kdl`.
-- `bin/` — kbd-color-sync, mangohud-color-sync, noctaliaq-gpu-prime, noctaliaq-gpu-launch.
+- `config/noctalia/kbd-color-sync.toml` — config confirmada (sat=1.6 val=0.85).
+- `bin/` — kbd-color-sync, mangohud-color-sync, noctaliaq-gpu-prime, noctaliaq-gpu-launch,
+  noctaliaq-gpu-flatpak-sync.
 - `icons/Bibata-Modern-Classic` — cursor vendorizado (tamaño 32).
+
+## Pendientes
+
+- **SDDM → greetd (Noctalia greeter):** reemplazar el display manager actual por greetd
+  usando el greeter propio de Noctalia.
+- **Gestor de archivos con sync de tema:** agregar uno que permita sincronizar su paleta
+  con el color-sync existente (mismo patrón que kbd-color-sync/mangohud-color-sync).
+- **Terminal:** evaluar alternativas a Alacritty; pendiente decidir cuál se agrega.
