@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# starship-color-sync — sincroniza el bookend morado/navy de starship.toml con accent_color de Noctalia.
+# Disparado por el hook nativo colors_changed (ver ~/.config/noctalia/config.toml).
+set -uo pipefail
+CSS="$HOME/.config/gtk-4.0/noctalia.css"
+CONF="$HOME/.config/starship.toml"
+[ -r "$CSS" ] || { echo "no encontré $CSS" >&2; exit 1; }
+[ -w "$CONF" ] || { echo "sin permiso de escritura en $CONF" >&2; exit 1; }
+hex=$(grep -oP '(?<=@define-color accent_color )#[0-9a-fA-F]{6}' "$CSS" | head -1)
+[ -n "$hex" ] || { echo "no pude leer accent_color de $CSS" >&2; exit 1; }
+hex_upper=$(echo "${hex#\#}" | tr '[:lower:]' '[:upper:]')
+cp "$CONF" "$CONF.bak.$(date +%s)"
+python3 - "$CONF" "$hex_upper" <<'PYEOF'
+import re, sys, pathlib
+conf, accent = sys.argv[1], sys.argv[2]
+p = pathlib.Path(conf)
+text = p.read_text()
+m1 = re.search(r'style_user = "bg:(#[0-9A-Fa-f]{6})"', text)
+m2 = re.search(r'\[time\].*?style = "bg:(#[0-9A-Fa-f]{6})"', text, re.S)
+assert m1, "no encontré style_user en starship.toml"
+assert m2, "no encontré [time] style en starship.toml"
+old1, old2 = m1.group(1), m2.group(1)
+text = text.replace(old1, f"#{accent}")
+if old2 != old1:
+    text = text.replace(old2, f"#{accent}")
+p.write_text(text)
+print(f"bookends: {old1}/{old2} -> #{accent}")
+PYEOF
+echo "starship-color-sync: accent #${hex_upper} aplicado"
