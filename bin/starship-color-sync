@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# starship-color-sync — recolorea toda la barra con primary/secondary/tertiary de Noctalia.
-# Bloques de 2 paradas por rol: primary(user,dir) secondary(git,lang) tertiary(docker,time).
+# starship-color-sync — recolorea toda la barra con primary de Noctalia (color plano, sin gradiente).
 # Las 5 flechas y las 2 cápsulas se reescriben por POSICIÓN ESTRUCTURAL fija,
 # nunca por el valor que tuvieran antes — así no se desincronizan entre corridas.
 set -uo pipefail
@@ -10,26 +9,20 @@ CONF="$HOME/.config/starship.toml"
 [ -w "$CONF" ] || { echo "sin permiso de escritura en $CONF" >&2; exit 1; }
 
 primary=$(grep -oP '(?<=^primary=)#[0-9a-fA-F]{6}' "$PALETTE" | head -1)
-secondary=$(grep -oP '(?<=^secondary=)#[0-9a-fA-F]{6}' "$PALETTE" | head -1)
-tertiary=$(grep -oP '(?<=^tertiary=)#[0-9a-fA-F]{6}' "$PALETTE" | head -1)
-[ -n "$primary" ] && [ -n "$secondary" ] && [ -n "$tertiary" ] || { echo "no pude leer primary/secondary/tertiary de $PALETTE" >&2; exit 1; }
+[ -n "$primary" ] || { echo "no pude leer primary de $PALETTE" >&2; exit 1; }
 
 primary_upper=$(echo "${primary#\#}" | tr '[:lower:]' '[:upper:]')
-secondary_upper=$(echo "${secondary#\#}" | tr '[:lower:]' '[:upper:]')
-tertiary_upper=$(echo "${tertiary#\#}" | tr '[:lower:]' '[:upper:]')
 
 cp "$CONF" "$CONF.bak.$(date +%s)"
 
-python3 - "$CONF" "$primary_upper" "$secondary_upper" "$tertiary_upper" <<'PYEOF'
+python3 - "$CONF" "$primary_upper" <<'PYEOF'
 import re, sys, pathlib
 
-conf, primary, secondary, tertiary = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+conf, primary = sys.argv[1], sys.argv[2]
 p = pathlib.Path(conf)
 text = p.read_text()
 
-t_user, t_dir, t_git, t_lang, t_dock, t_time = (
-    primary, primary, secondary, secondary, tertiary, tertiary
-)
+t_user = t_dir = t_git = t_lang = t_dock = t_time = primary
 
 def sync_home(pattern, new_val):
     global text
@@ -62,4 +55,4 @@ text = re.sub(r'^\[ \]\(fg:#[0-9A-Fa-f]{6}\)\\$',
 p.write_text(text)
 print(f"paleta: user=#{t_user} dir=#{t_dir} git=#{t_git} lang=#{t_lang} docker=#{t_dock} time=#{t_time}")
 PYEOF
-echo "starship-color-sync: primary=#${primary_upper} secondary=#${secondary_upper} tertiary=#${tertiary_upper} -> paleta + flechas aplicadas"
+echo "starship-color-sync: primary=#${primary_upper} -> color plano aplicado a las 6 paradas"
