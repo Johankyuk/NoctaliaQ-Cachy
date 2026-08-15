@@ -1,14 +1,42 @@
 #!/usr/bin/env bash
 # noctaliaq-gpu-prime — activa/desactiva el estado de PRIME offload.
 # El estado lo lee noctaliaq-gpu-launch en cada lanzamiento del launcher.
+# Verifica AC real en sysfs (ground truth) en vez de confiar ciegamente en el
+# argumento que manda Noctalia: sus hooks battery_plugged/battery_discharging
+# pueden disparar erróneo durante la transición de estado de la batería
+# (visto: pending-charge -> discharging tarda ~9s en asentarse en UPower,
+# y Noctalia puede leer un estado intermedio mal). flock + debounce de 300ms
+# evitan que invocaciones concurrentes o fantasma pisen el estado correcto.
 # También dispara noctaliaq-gpu-flatpak-sync acá mismo (no via array de hooks):
 # Noctalia solo ejecuta el primer ítem de un array en hooks battery_*, a diferencia
 # de colors_changed que sí corre todos — así que se encadena a mano en vez de confiar en eso.
-set -u
+set -uo pipefail
 STATE=~/.local/state/noctaliaq/gpu-prime-state
+LOCK=~/.local/state/noctaliaq/gpu-prime.lock
+mkdir -p "$(dirname "$STATE")"
+
+exec 200>"$LOCK"
+flock -w 5 200 || { logger -t noctaliaq-gpu-prime "no se pudo tomar el lock, abortando"; exit 1; }
+
 case "${1:-}" in
-  on)  echo "on"  > "$STATE"; logger -t noctaliaq-gpu-prime "PRIME offload activado (AC)" ;;
-  off) echo "off" > "$STATE"; logger -t noctaliaq-gpu-prime "PRIME offload desactivado (bateria)" ;;
+  on|off) ;;
   *) echo "uso: noctaliaq-gpu-prime [on|off]" >&2; exit 1 ;;
 esac
+
+sleep 0.3
+AC_ONLINE=$(cat /sys/class/power_supply/ACAD/online 2>/dev/null || echo 0)
+[[ "$AC_ONLINE" == "1" ]] && REAL="on" || REAL="off"
+
+CURRENT=$(cat "$STATE" 2>/dev/null || echo "")
+if [[ "$CURRENT" == "$REAL" ]]; then
+  [[ "$REAL" != "${1:-}" ]] && logger -t noctaliaq-gpu-prime "evento '$1' descartado, sysfs dice '$REAL' (sin cambio)"
+  exit 0
+fi
+
+echo "$REAL" > "$STATE"
+if [[ "$REAL" == "on" ]]; then
+  logger -t noctaliaq-gpu-prime "PRIME offload activado (AC) [sysfs verificado]"
+else
+  logger -t noctaliaq-gpu-prime "PRIME offload desactivado (bateria) [sysfs verificado]"
+fi
 ~/.local/bin/noctaliaq-gpu-flatpak-sync
