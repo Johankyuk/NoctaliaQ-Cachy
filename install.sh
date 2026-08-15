@@ -30,6 +30,7 @@ backup_and_copy "$REPO_DIR/config/MangoHud/MangoHud.conf" "$HOME/.config/MangoHu
 
 echo "== MangoHud en flatpaks (Sober / mcpelauncher) =="
 if flatpak info org.vinegarhq.Sober &>/dev/null || flatpak info io.mrarm.mcpelauncher &>/dev/null; then
+  flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
   flatpak install --user -y flathub org.freedesktop.Platform.VulkanLayer.MangoHud//25.08 || true
   flatpak override --user --filesystem=xdg-config/MangoHud:ro
   if flatpak info org.vinegarhq.Sober &>/dev/null; then
