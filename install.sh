@@ -49,10 +49,6 @@ else
   echo "Ni Sober ni mcpelauncher están instalados, se omite."
 fi
 
-echo "== Alacritty =="
-backup_and_copy "$REPO_DIR/config/alacritty/alacritty.toml" "$HOME/.config/alacritty/alacritty.toml"
-backup_and_copy "$REPO_DIR/config/alacritty/themes" "$HOME/.config/alacritty/themes"
-
 echo "== niri cfg =="
 for f in "$REPO_DIR"/config/niri/cfg/*.kdl; do
   backup_and_copy "$f" "$HOME/.config/niri/cfg/$(basename "$f")"
@@ -62,8 +58,8 @@ echo "== Fish (config + greeting) =="
 backup_and_copy "$REPO_DIR/config/fish/config.fish" "$HOME/.config/fish/config.fish"
 backup_and_copy "$REPO_DIR/config/fish/functions/fish_greeting.fish" "$HOME/.config/fish/functions/fish_greeting.fish"
 
-echo "== Kitty (config + tema Noctalia) =="
-backup_and_copy "$REPO_DIR/config/kitty" "$HOME/.config/kitty"
+echo "== Foot (config + tema Noctalia) =="
+backup_and_copy "$REPO_DIR/config/foot" "$HOME/.config/foot"
 
 echo "== niri config.kdl (window-rules, blur) =="
 backup_and_copy "$REPO_DIR/config/niri/config.kdl" "$HOME/.config/niri/config.kdl"

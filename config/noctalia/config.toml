@@ -179,7 +179,7 @@ main_axis_padding = 16
 margin_edge = 0
 margin_ends = 0
 monitors = []
-pinned = [ "Alacritty", "nvtop", "btop", "zen", "discord", "org.vinegarhq.Sober" ]
+pinned = [ "Foot", "nvtop", "btop", "zen", "discord", "org.vinegarhq.Sober" ]
 position = "bottom"
 radius = 80
 radius_bottom_left = 80
@@ -201,7 +201,7 @@ battery_plugged = [ "~/.local/bin/noctaliaq-gpu-prime on" ]
 battery_unplugged = [ "~/.local/bin/noctaliaq-gpu-prime off" ]
 bluetooth_disabled = []
 bluetooth_enabled = []
-colors_changed = [ "/home/kyu/.local/bin/kbd-color-sync --sat=1.6 --val=0.85", "/home/kyu/.local/bin/mangohud-color-sync", "/home/kyu/.local/bin/starship-color-sync"]
+colors_changed = [ "/home/kyu/.local/bin/kbd-color-sync --sat=1.6 --val=0.85", "/home/kyu/.local/bin/mangohud-color-sync"]
 logging_out = []
 power_profile_changed = []
 rebooting = []
@@ -645,7 +645,7 @@ source = "wallpaper"
 wallpaper_scheme = "dysfunctional"
 
     [theme.templates]
-    builtin_ids = [ "alacritty", "btop", "cava", "gtk3", "gtk4", "kcolorscheme", "kitty", "niri", "qt" ]
+    builtin_ids = [ "btop", "cava", "gtk3", "gtk4", "kcolorscheme", "foot", "niri", "qt" ]
     community_ids = [ "zen-browser", "discord", "heroiclauncher", "steam", "fastfetch" ]
     enable_builtin_templates = true
     enable_community_templates = true
@@ -757,3 +757,7 @@ type = "tadomika_ari/config-swap:widget"
 hide_when_empty = true
 show_labels = false
 type = "workspaces"
+
+[theme.templates.user.palette_raw]
+input_path = "~/.config/noctalia/templates/palette-raw.conf"
+output_path = "~/.cache/noctalia/palette-raw.conf"
