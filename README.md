@@ -23,5 +23,3 @@ git clone git@github.com:Johankyuk/NoctaliaQ-Cachy.git && cd NoctaliaQ-Cachy && 
 
 - **SDDM → greetd (Noctalia greeter):** reemplazar el display manager actual por greetd
   usando el greeter propio de Noctalia.
-- **Gestor de archivos con sync de tema:** agregar uno que permita sincronizar su paleta
-  con el color-sync existente (mismo patrón que kbd-color-sync/mangohud-color-sync).

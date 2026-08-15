@@ -49,6 +49,14 @@ else
   echo "Ni Sober ni mcpelauncher están instalados, se omite."
 fi
 
+echo "== Dolphin (paquete + color scheme) =="
+if ! pacman -Qi dolphin &>/dev/null; then
+  sudo pacman -S --needed --noconfirm dolphin
+else
+  echo "dolphin ya instalado, se omite pacman."
+fi
+kwriteconfig6 --file dolphinrc --group UiSettings --key ColorScheme noctalia
+
 echo "== niri cfg =="
 for f in "$REPO_DIR"/config/niri/cfg/*.kdl; do
   backup_and_copy "$f" "$HOME/.config/niri/cfg/$(basename "$f")"
