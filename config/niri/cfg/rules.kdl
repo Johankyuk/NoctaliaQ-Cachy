@@ -43,3 +43,9 @@
           // blur false
         }
     }
+
+// Dolphin — opacity para que se vea el blur global que ya está activo.
+window-rule {
+    match app-id=r#"^org\.kde\.dolphin$"#
+    opacity 0.75
+}
