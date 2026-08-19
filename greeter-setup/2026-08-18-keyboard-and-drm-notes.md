@@ -111,3 +111,32 @@ carga" que no haya instancias colgadas:
 pkill -f jupyter-notebook
 ss -tlnp | grep 888
 ```
+
+---
+
+## 6. Pantalla negra en boot en frío (race con plymouth)
+
+**Síntoma:** arrancando de cero (no logout/relogin), el greeter no daba
+imagen — había que entrar a una TTY y `systemctl restart greetd`
+manualmente para que cargara.
+
+**Root cause:** `greetd.service` declara `After=plymouth-quit-wait.service`,
+pero ese unit solo confirma que el boot general llegó al punto de poder
+cerrar plymouth — no espera a que `plymouthd` termine de soltar el DRM
+master del framebuffer. En el boot fallido (`journalctl -b -2`), hubo solo
+~56ms entre la señal de quit a plymouthd y el arranque de greetd, que ya
+intentaba tomar `/dev/dri/card2` — coincide con el error
+`Device or resource busy` visto en `greeter-debug.log`.
+
+**Fix:** drop-in en `greeter-setup/systemd-overrides/greetd-plymouth-race.conf`,
+instalar con:
+```bash
+sudo mkdir -p /etc/systemd/system/greetd.service.d
+sudo cp greeter-setup/systemd-overrides/greetd-plymouth-race.conf \
+  /etc/systemd/system/greetd.service.d/plymouth-race.conf
+sudo systemctl daemon-reload
+```
+
+Agrega `After=plymouth-quit.service` explícito + `ExecStartPre=sleep 1`
+como margen de seguridad. Validado con reboot en frío tras habilitar
+greetd como default (`systemctl enable greetd`, `disable sddm`).
