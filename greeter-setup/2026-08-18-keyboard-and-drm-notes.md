@@ -58,3 +58,56 @@ libera `/dev/dri/card2` a tiempo antes de que systemd reinicie
 
 No se confirmó explícitamente si `ñ`/`á` se pueden escribir en el campo
 de password (el login username-only sí funcionó con el layout aplicado).
+
+---
+
+## 4. Fallbacks de apps del launcher no respetan defaults del sistema
+
+**Terminal:** el binario `noctalia` trae una lista de fallback hardcodeada
+para abrir terminal (`gnome-terminal → x-terminal-emulator → kitty →
+alacritty → wezterm → foot`), sin key de config expuesta para forzar una
+específica. Con `alacritty`/`kitty` instalados, siempre ganaban sobre
+`foot` aunque `foot` fuera el terminal real en uso.
+
+**Fix:**
+```bash
+sudo pacman -R alacritty kitty
+```
+
+**Browser (parte 1 — auto-open de Jupyter vía http://):** el módulo
+`webbrowser` de Python tiene su propia lista de navegadores conocidos por
+nombre y los busca directo en PATH — no pasa por `xdg-open` ni por
+`~/.config/mimeapps.list`. Con `firefox` instalado (no usado, solo Zen),
+siempre ganaba sobre Zen (`zen-bin`, no reconocido por el módulo).
+
+**Fix:**
+```bash
+echo 'export BROWSER=xdg-open' >> ~/.zshrc
+sudo pacman -R firefox
+```
+
+**Browser (parte 2 — redirect file .html):** aun con `$BROWSER=xdg-open`
+seteado, abrir un `file://` (el `jpserver-*-open.html` que genera Jupyter)
+dispara un bug distinto en `xdg-open`: su función `open_generic()`
+detecta el DE como "generic" (Niri no está en su lista de DEs conocidos)
+y en esa rama **sobrescribe** `$BROWSER` con su propia lista hardcodeada,
+ignorando tanto la variable de entorno como `mimeapps.list`. Confirmado
+con `bash -x /usr/bin/xdg-open <url>`.
+
+**Fix:** evitar que Jupyter genere ese archivo intermedio, forzándolo a
+abrir la URL `http://` directamente (que sí respeta `$BROWSER`):
+```bash
+jupyter notebook --generate-config
+echo "c.ServerApp.use_redirect_file = False" >> ~/.jupyter/jupyter_notebook_config.py
+```
+
+## 5. Puertos de Jupyter acumulados
+
+`jupyter notebook` no fallaba si el puerto 8888 estaba ocupado por una
+instancia previa sin cerrar (terminal cerrada de golpe, proceso huérfano);
+simplemente probaba 8889, 8890, etc. Confirmar antes de reportar "no
+carga" que no haya instancias colgadas:
+```bash
+pkill -f jupyter-notebook
+ss -tlnp | grep 888
+```
