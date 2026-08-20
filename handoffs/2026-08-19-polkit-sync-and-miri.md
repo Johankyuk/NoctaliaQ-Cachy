@@ -137,6 +137,9 @@ la documentación upstream puede no corresponder a esta versión.
 
 ## Pendientes abiertos
 
+> **Actualización 2026-08-19 (cierre de sesión):** todos los pendientes
+> de esta lista quedaron resueltos. Ver notas al final.
+
 1. **`bc97a84` sin validar.** Fix del race de DRM en cold boot: añade
    `After=plymouth-quit.service` + `ExecStartPre=/usr/bin/sleep 1` vía
    drop-in. Razonamiento sólido (ventana de ~56ms medida en journal
@@ -169,3 +172,33 @@ la documentación upstream puede no corresponder a esta versión.
   parece "el archivo no existe".
 - `/etc/polkit-1/rules.d/` es `750 root:polkitd` — requiere `sudo` hasta
   para listar.
+
+
+---
+
+## Cierre de sesión — todo validado
+
+- **`bc97a84` VALIDADO.** Cold boot limpio, greeter sin pantalla negra,
+  sin `Device or resource busy` en journal. El race de DRM está cerrado.
+- **Backups rotados.** `bin/rotate-backups.sh` conserva los N más
+  recientes por archivo base (default 3). Limpió 16 archivos.
+- **`NOCTALIA_GREETER_LOG` removido** del `command=` de greetd tras
+  validar. Era para debug del bug de teclado y del race, ambos cerrados;
+  el log crecía sin rotación. Los eventos siguen en `journalctl -u greetd`.
+- **Layout del greeter alineado a `latam`.** `localectl` reporta
+  `X11 Layout=latam` y `VC Keymap=la-latin1`, pero el greeter usaba `es`
+  (España). Difieren en `<`, `>`, `@` y teclas muertas.
+- **foot: `alpha-mode=all`** para transparencia en apps TUI. `matching`
+  no sirve porque el tema usa `1b0d30` y las apps pintan `000000`.
+  Trade-off aceptado: celdas con fondo intermedio quedan como bloques
+  visibles. Gotcha: **SIGUSR1 no recarga foot**, alterna a tema dark; los
+  cambios solo aplican a ventanas nuevas.
+- Duplicado `~/.config/foot/foot/` (de un `cp -r` mal hecho) movido a
+  `.foot-duplicado.bak.*`. Borrar en unos días si nada falla.
+
+**El proyecto queda sin pendientes abiertos.**
+
+Posible tema futuro: el greeter se reinicia al despertar de suspensión
+(`logind-resume` observa `PrepareForSleep`), así que un ciclo de
+suspend/resume es otra vía por la que el race de DRM podría manifestarse.
+No se ha probado.
