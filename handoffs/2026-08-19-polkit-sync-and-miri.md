@@ -149,7 +149,7 @@ la documentación upstream puede no corresponder a esta versión.
    por `backup_and_copy()`. Dejar los 3 más recientes y agregar rotación
    a la función.
 
-3. Validar en el próximo cold boot: greeter sin cuelgue, teclado (XKB_DEFAULT_LAYOUT=es),
+3. Validar en el próximo cold boot: greeter sin cuelgue, teclado (XKB_DEFAULT_LAYOUT=latam),
    y sync sin prompt tras login.
 
 ---

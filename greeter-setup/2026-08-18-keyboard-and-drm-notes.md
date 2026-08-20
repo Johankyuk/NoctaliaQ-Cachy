@@ -11,7 +11,7 @@
 Fix en `/etc/greetd/config.toml`:
 ```toml
 [default_session]
-command = "env XKB_DEFAULT_LAYOUT=es /usr/bin/noctalia-greeter-session -- --session niri"
+command = "env XKB_DEFAULT_LAYOUT=latam /usr/bin/noctalia-greeter-session -- --session niri"
 user = "greeter"
 ```
 
@@ -29,7 +29,7 @@ sudo chmod 644 /var/log/greeter-debug.log
 
 Config final:
 ```toml
-command = "env XKB_DEFAULT_LAYOUT=es NOCTALIA_GREETER_LOG=/var/log/greeter-debug.log /usr/bin/noctalia-greeter-session -- --session niri"
+command = "env XKB_DEFAULT_LAYOUT=latam NOCTALIA_GREETER_LOG=/var/log/greeter-debug.log /usr/bin/noctalia-greeter-session -- --session niri"
 ```
 
 ## 3. Race de DRM al re-lanzar el greeter (device busy)
