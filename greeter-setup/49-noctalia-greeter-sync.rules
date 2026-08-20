@@ -1,0 +1,12 @@
+// NoctaliaQ-Cachy: permite al usuario activo sincronizar apariencia al greeter
+// sin prompt de polkit. Acotado a la action propia de Noctalia, cuya policy
+// fija exec.path=/usr/bin/noctalia-greeter-apply-appearance.
+// Requiere shell.greeter_sync.privilege_command = "pkexec" en config.toml.
+polkit.addRule(function(action, subject) {
+    if (action.id == "org.noctalia.greeter.apply-appearance" &&
+        subject.isInGroup("wheel") &&
+        subject.local &&
+        subject.active) {
+        return polkit.Result.YES;
+    }
+});
