@@ -63,11 +63,34 @@ for f in "$REPO_DIR"/config/niri/cfg/*.kdl; do
   backup_and_copy "$f" "$HOME/.config/niri/cfg/$(basename "$f")"
 done
 
-echo "== Fish (config + greeting) =="
-backup_and_copy "$REPO_DIR/config/fish/config.fish" "$HOME/.config/fish/config.fish"
-backup_and_copy "$REPO_DIR/config/fish/functions/fish_greeting.fish" "$HOME/.config/fish/functions/fish_greeting.fish"
+echo "== Zsh (paquetes + config + p10k) =="
+if ! pacman -Qi zsh &>/dev/null; then
+  sudo pacman -S --needed --noconfirm zsh
+else
+  echo "zsh ya instalado, se omite pacman."
+fi
+if ! pacman -Qi cachyos-zsh-config &>/dev/null; then
+  sudo pacman -S --needed --noconfirm cachyos-zsh-config
+else
+  echo "cachyos-zsh-config ya instalado, se omite pacman."
+fi
+command -v zoxide &>/dev/null || sudo pacman -S --needed --noconfirm zoxide
+command -v eza &>/dev/null || sudo pacman -S --needed --noconfirm eza
+backup_and_copy "$REPO_DIR/config/zsh/zshrc" "$HOME/.zshrc"
+backup_and_copy "$REPO_DIR/config/zsh/p10k.zsh" "$HOME/.p10k.zsh"
+if [ "$(basename "$SHELL")" != "zsh" ]; then
+  chsh -s "$(command -v zsh)" "$USER"
+  echo "shell cambiada a zsh -- toma efecto en el proximo login"
+else
+  echo "zsh ya es la shell por defecto."
+fi
 
-echo "== Foot (config + tema Noctalia) =="
+echo "== Foot (paquete + config + tema Noctalia) =="
+if ! pacman -Qi foot &>/dev/null; then
+  sudo pacman -S --needed --noconfirm foot
+else
+  echo "foot ya instalado, se omite pacman."
+fi
 backup_and_copy "$REPO_DIR/config/foot" "$HOME/.config/foot"
 
 echo "== niri config.kdl (window-rules, blur) =="
