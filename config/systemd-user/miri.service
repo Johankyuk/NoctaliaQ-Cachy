@@ -5,7 +5,7 @@ After=niri.service
 
 [Service]
 ExecStart=%h/.local/bin/miri service start
-ExecStartPost=/bin/sh -c 'for i in 1 2 3 4 5; do sleep 1; /home/kyu/.local/bin/miri action set-focused-workspace-mode master && break; done'
+ExecStartPost=/bin/sh -c 'for i in 1 2 3 4 5; do sleep 1; %h/.local/bin/miri action set-focused-workspace-mode master && break; done'
 Restart=on-failure
 RestartSec=5s
 Type=simple

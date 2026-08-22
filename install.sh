@@ -96,6 +96,19 @@ backup_and_copy "$REPO_DIR/config/foot" "$HOME/.config/foot"
 echo "== niri config.kdl (window-rules, blur) =="
 backup_and_copy "$REPO_DIR/config/niri/config.kdl" "$HOME/.config/niri/config.kdl"
 
+echo "== Zen Browser =="
+if ! pacman -Qi zen-browser-bin &>/dev/null; then
+  sudo pacman -S --needed --noconfirm zen-browser-bin
+else
+  echo "zen-browser-bin ya instalado, se omite pacman."
+fi
+
+echo "== Miri (config + servicio systemd --user) =="
+backup_and_copy "$REPO_DIR/config/miri/config.toml" "$HOME/.config/miri/config.toml"
+backup_and_copy "$REPO_DIR/config/systemd-user/miri.service" "$HOME/.config/systemd/user/miri.service"
+systemctl --user daemon-reload
+systemctl --user enable miri.service
+
 echo "== Scripts .local/bin =="
 mkdir -p "$HOME/.local/bin"
 for f in "$REPO_DIR"/bin/*; do
