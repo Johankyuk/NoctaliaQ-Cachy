@@ -33,6 +33,8 @@ Todo archivo que reemplaza se respalda como `archivo.bak.<timestamp>` antes de s
 - **Zsh**: paquete + `cachyos-zsh-config` + zoxide + eza + `.zshrc`/`.p10k.zsh`, y cambia la
   shell por defecto del usuario (`chsh`, pide password del usuario).
 - **Foot**: paquete + config + tema dinámico Noctalia.
+- **Zen Browser**: paquete `zen-browser-bin` (repo `cachyos`, sin AUR).
+- **Miri**: `config.toml` + servicio `systemd --user` (habilitado, arranca junto con niri).
 - **Scripts** de `bin/` → `~/.local/bin/` (kbd-color-sync, mangohud-color-sync,
   noctaliaq-gpu-prime, noctaliaq-gpu-launch, noctaliaq-gpu-flatpak-sync).
 
@@ -54,9 +56,3 @@ icons/ — cursor Bibata vendorizado
 greeter-setup/ — módulo manual: SDDM → greetd
 file-manager-fix/ — módulo manual: Dolphin default
 handoffs/ — notas de sesiones de trabajo, no se despliegan
-
-## Pendientes
-
-- **`config/miri/` + `config/systemd-user/miri.service`**: están en el repo pero
-  `install.sh` todavía no los despliega — confirmar si es una integración a medio hacer
-  o un experimento aparte antes de engancharlo al instalador.
