@@ -16,3 +16,5 @@ window-rule {
         xray false
     }
 }
+
+include "./cfg/cursor.kdl"
