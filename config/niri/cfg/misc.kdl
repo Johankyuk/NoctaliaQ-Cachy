@@ -12,10 +12,6 @@
         XCURSOR_SIZE "32"
     }
 
-    cursor {
-        xcursor-theme "Bibata-Modern-Classic"
-        xcursor-size 32
-    }
 
     blur {
         passes 2        // more passes = stronger blur (default: 3)
