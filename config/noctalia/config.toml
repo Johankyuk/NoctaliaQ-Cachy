@@ -198,7 +198,6 @@ battery_charging = [ ]
 battery_discharging = [ "~/.local/bin/noctaliaq-gpu-prime off" ]
 battery_percentage_changed = []
 battery_plugged = [ "~/.local/bin/noctaliaq-gpu-prime on" ]
-battery_unplugged = [ "~/.local/bin/noctaliaq-gpu-prime off" ]
 bluetooth_disabled = []
 bluetooth_enabled = []
 colors_changed = [ "/home/kyu/.local/bin/kbd-color-sync --sat=1.6 --val=0.85", "/home/kyu/.local/bin/mangohud-color-sync"]
@@ -468,6 +467,8 @@ time_format = "{:%-I:%M:%S %p}"
     speed = 0.75
 
     [shell.greeter_sync]
+
+    privilege_command = "pkexec"
     auto_sync = false
 
     [shell.keyboard_layout]
@@ -746,9 +747,6 @@ type = "spacer"
 [widget.temp]
 stat = "cpu_temp"
 type = "sysmon"
-
-[widget.widget]
-type = "yuuto/arch-updater:widget"
 
 [widget.widget_2]
 type = "tadomika_ari/config-swap:widget"
