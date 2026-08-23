@@ -11,10 +11,10 @@ backup_and_copy() {
   cp -r "$src" "$dst"
 }
 
-echo "== Cursor Bibata-Modern-Classic (tamaño 32) =="
-backup_and_copy "$REPO_DIR/icons/Bibata-Modern-Classic" "$HOME/.local/share/icons/Bibata-Modern-Classic"
-gsettings set org.gnome.desktop.interface cursor-theme "Bibata-Modern-Classic" 2>/dev/null || true
-gsettings set org.gnome.desktop.interface cursor-size 32 2>/dev/null || true
+echo "== Tema de cursor =="
+# El tema y el tamaño los gobierna config/niri/cfg/cursor.kdl, fuente única.
+# Acá solo se garantiza que el paquete esté instalado.
+pacman -Qi capitaine-cursors >/dev/null 2>&1 || sudo pacman -S --needed capitaine-cursors
 
 echo "== Config Noctalia =="
 backup_and_copy "$REPO_DIR/config/noctalia/config.toml" "$HOME/.config/noctalia/config.toml"
@@ -24,8 +24,6 @@ backup_and_copy "$REPO_DIR/config/noctalia/config.toml" "$HOME/.config/noctalia/
 # propio son invisibles para el launcher.
 backup_and_copy "$REPO_DIR/config/environment.d/10-path.conf" "$HOME/.config/environment.d/10-path.conf"
 
-echo "== Tema de cursor =="
-pacman -Qi capitaine-cursors >/dev/null 2>&1 || sudo pacman -S --needed --noconfirm capitaine-cursors
 backup_and_copy "$REPO_DIR/config/noctalia/kbd-color-sync.toml" "$HOME/.config/noctalia/kbd-color-sync.toml"
 
 echo "== MangoHud (paquete + config) =="
