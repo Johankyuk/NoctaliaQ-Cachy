@@ -18,6 +18,14 @@ gsettings set org.gnome.desktop.interface cursor-size 32 2>/dev/null || true
 
 echo "== Config Noctalia =="
 backup_and_copy "$REPO_DIR/config/noctalia/config.toml" "$HOME/.config/noctalia/config.toml"
+
+# --- PATH de la sesión gráfica ---------------------------------------------
+# systemd --user no incluye ~/.local/bin; sin esto, miri y cualquier binario
+# propio son invisibles para el launcher.
+backup_and_copy "$REPO_DIR/config/environment.d/10-path.conf" "$HOME/.config/environment.d/10-path.conf"
+
+echo "== Tema de cursor =="
+pacman -Qi capitaine-cursors >/dev/null 2>&1 || sudo pacman -S --needed --noconfirm capitaine-cursors
 backup_and_copy "$REPO_DIR/config/noctalia/kbd-color-sync.toml" "$HOME/.config/noctalia/kbd-color-sync.toml"
 
 echo "== MangoHud (paquete + config) =="
