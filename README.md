@@ -52,7 +52,6 @@ tocar el display manager del sistema, o dependen de contexto que varía por máq
 ## Estructura
 config/ — dotfiles: noctalia, niri, foot, zsh, MangoHud
 bin/ — scripts desplegados a ~/.local/bin
-icons/ — cursor Bibata vendorizado
 greeter-setup/ — módulo manual: SDDM → greetd
 file-manager-fix/ — módulo manual: Dolphin default
 handoffs/ — notas de sesiones de trabajo, no se despliegan
