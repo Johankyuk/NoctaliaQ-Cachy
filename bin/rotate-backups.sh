@@ -4,7 +4,12 @@
 set -uo pipefail
 
 KEEP=${1:-3}
-DIRS=("$HOME/.config/noctalia" "$HOME/.config/foot" "$HOME/.config/systemd/user")
+if ! [[ $KEEP =~ ^[0-9]+$ ]]; then
+    echo "error: N debe ser un entero, se recibio: $KEEP" >&2
+    echo "uso: rotate-backups.sh [N]   (el script no acepta rutas)" >&2
+    exit 2
+fi
+DIRS=("$HOME/.config/noctalia" "$HOME/.config/foot" "$HOME/.config/systemd/user" "$HOME/.local/state/noctalia" "$HOME/.config/niri/cfg")
 
 for dir in "${DIRS[@]}"; do
     [[ -d $dir ]] || continue
@@ -15,8 +20,8 @@ for dir in "${DIRS[@]}"; do
         for f in "${files[@]:$KEEP}"; do
             rm -f "$f" && echo "  borrado: ${f#$HOME/}"
         done
-    done < <(find "$dir" -maxdepth 1 -type f -name '*.*.*' -printf '%f\n' \
-             | sed -E 's/\.(bak|pre-[^.]*|corrupto|antes-[^.]*)\.[0-9]+$//' \
+    done < <(find -L "$dir" -maxdepth 1 -type f -name '*.*.*' -printf '%f\n' \
+             | sed -E 's/\.(bak|pre-[^.]*|corrupto|antes-[^.]*)\.[0-9]+(-[0-9]+)?$//' \
              | sort -u)
 done
 echo "✓ terminado (conservados: $KEEP por archivo)"
