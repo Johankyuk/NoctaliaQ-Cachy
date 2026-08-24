@@ -144,8 +144,7 @@ binds {
     Mod+F                               { maximize-column; }
     Mod+Shift+F                         { fullscreen-window; }
     Mod+W                               { toggle-column-tabbed-display; }
-    Mod+M                               { maximize-window-to-edges; }
-
+    Mod+M                               { spawn-sh "$HOME/.local/bin/miri action cycle-focused-workspace-mode"; }
     // ─── Screenshots ───
     CTRL+Shift+1                        { screenshot; }
     Print                                { screenshot; }
