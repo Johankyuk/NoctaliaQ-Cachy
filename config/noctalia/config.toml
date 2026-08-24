@@ -52,7 +52,7 @@ order = [ "default", "Bar_side" ]
     shadow = true
     show_on_workspace_switch = false
     smart_auto_hide = false
-    start = [ "widget", "keybinds" ]
+    start = [ "keybinds" ]
     thickness = 41
     widget_spacing = 7
 
