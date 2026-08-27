@@ -7,7 +7,7 @@ REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 backup_and_copy() {
   local src="$1" dst="$2"
   mkdir -p "$(dirname "$dst")"
-  [ -e "$dst" ] && cp -r "$dst" "$dst.bak.$(date +%s)"
+  if [ -e "$dst" ]; then cp -r "$dst" "$dst.bak.$(date +%s)"; fi
   if [ -d "$src" ]; then
     mkdir -p "$dst"
     cp -rT "$src" "$dst"
