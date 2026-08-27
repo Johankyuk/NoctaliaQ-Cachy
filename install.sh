@@ -38,10 +38,10 @@ backup_and_copy "$REPO_DIR/config/noctalia/config.toml" "$HOME/.config/noctalia/
 # Noctalia no expande ~ ni $HOME en el TOML: las rutas se resuelven aca,
 # sobre la copia desplegada. El archivo del repo queda portable.
 _cfg="$HOME/.config/noctalia/config.toml"
-sed -i "s|\"HOOK\"|\"$HOME/.config/noctalia/scripts/rgb-sync-hook.sh\"|g; s|/home/kyu/|$HOME/|g" "$_cfg"
-if grep -q 'HOOK\|/home/kyu' "$_cfg"; then
+sed -i "s|\"HOOK\"|\"$HOME/.config/noctalia/scripts/rgb-sync-hook.sh\"|g; s|/home/kyu/|$HOME/|g; s|\"HOME/|\"$HOME/|g" "$_cfg"
+if grep -q 'HOOK\|/home/kyu\|"HOME/' "$_cfg"; then
   echo "ERROR: quedaron placeholders sin sustituir en $_cfg" >&2
-  grep -n 'HOOK\|/home/kyu' "$_cfg" >&2
+  grep -n 'HOOK\|/home/kyu\|"HOME/' "$_cfg" >&2
   exit 1
 fi
 echo "config.toml: rutas resueltas para $USER."
