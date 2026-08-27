@@ -195,9 +195,9 @@ smart_auto_hide = true
 
 [hooks]
 battery_charging = []
-battery_discharging = [ "~/.local/bin/noctaliaq-gpu-prime off" ]
+battery_discharging = [ "HOME/.local/bin/noctaliaq-gpu-prime off" ]
 battery_percentage_changed = []
-battery_plugged = [ "~/.local/bin/noctaliaq-gpu-prime on" ]
+battery_plugged = [ "HOME/.local/bin/noctaliaq-gpu-prime on" ]
 bluetooth_disabled = []
 bluetooth_enabled = []
 colors_changed = [ "HOOK" ]
@@ -474,7 +474,7 @@ external_ip_enabled = false
 font_family = "sans-serif"
 input_borders = true
 launch_apps_as_systemd_services = false
-launch_apps_custom_command = ""
+launch_apps_custom_command = "HOME/.local/bin/noctaliaq-gpu-launch $CMD"
 niri_overview_type_to_launch_enabled = true
 offline_mode = false
 password_style = "random"

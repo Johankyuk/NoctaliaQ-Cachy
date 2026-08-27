@@ -12,6 +12,14 @@ if [[ -f "$STATE" ]] && [[ "$(cat "$STATE")" == "on" ]]; then
              DRI_PRIME=1 \
              "$@"
 else
-    exec env VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/radeon_icd.json \
-             "$@"
+    ICDS=""
+    for f in /usr/share/vulkan/icd.d/*.json; do
+        case "$f" in *nvidia*|*hasvk*) continue;; esac
+        ICDS="${ICDS}${ICDS:+:}$f"
+    done
+    if [[ -n "$ICDS" ]]; then
+        exec env VK_ICD_FILENAMES="$ICDS" "$@"
+    else
+        exec "$@"
+    fi
 fi
