@@ -8,8 +8,25 @@ backup_and_copy() {
   local src="$1" dst="$2"
   mkdir -p "$(dirname "$dst")"
   [ -e "$dst" ] && cp -r "$dst" "$dst.bak.$(date +%s)"
-  cp -r "$src" "$dst"
+  if [ -d "$src" ]; then
+    mkdir -p "$dst"
+    cp -rT "$src" "$dst"
+  else
+    cp "$src" "$dst"
+  fi
 }
+
+echo "== RGB (Alienware) =="
+if [ "$(cat /sys/class/dmi/id/sys_vendor 2>/dev/null)" = "Alienware" ]; then
+  install -Dm755 "$REPO_DIR/bin/alienware/alienfx.py" "$HOME/.local/bin/alienfx.py"
+  install -Dm755 "$REPO_DIR/bin/alienware/rgb-sync.py" "$HOME/.local/bin/rgb-sync.py"
+  pacman -Qi python-pyusb >/dev/null 2>&1 || sudo pacman -S --needed --noconfirm python-pyusb
+  echo "Regla udev: ver alienware-setup/ (requiere root, no automatico)."
+else
+  echo "No es Alienware, se omite."
+fi
+backup_and_copy "$REPO_DIR/config/noctalia/scripts/rgb-sync-hook.sh" "$HOME/.config/noctalia/scripts/rgb-sync-hook.sh"
+chmod +x "$HOME/.config/noctalia/scripts/rgb-sync-hook.sh"
 
 echo "== Tema de cursor =="
 # El tema y el tamaño los gobierna config/niri/cfg/cursor.kdl, fuente única.
@@ -18,6 +35,16 @@ pacman -Qi capitaine-cursors >/dev/null 2>&1 || sudo pacman -S --needed capitain
 
 echo "== Config Noctalia =="
 backup_and_copy "$REPO_DIR/config/noctalia/config.toml" "$HOME/.config/noctalia/config.toml"
+# Noctalia no expande ~ ni $HOME en el TOML: las rutas se resuelven aca,
+# sobre la copia desplegada. El archivo del repo queda portable.
+_cfg="$HOME/.config/noctalia/config.toml"
+sed -i "s|\"HOOK\"|\"$HOME/.config/noctalia/scripts/rgb-sync-hook.sh\"|g; s|/home/kyu/|$HOME/|g" "$_cfg"
+if grep -q 'HOOK\|/home/kyu' "$_cfg"; then
+  echo "ERROR: quedaron placeholders sin sustituir en $_cfg" >&2
+  grep -n 'HOOK\|/home/kyu' "$_cfg" >&2
+  exit 1
+fi
+echo "config.toml: rutas resueltas para $USER."
 
 # --- PATH de la sesión gráfica ---------------------------------------------
 # systemd --user no incluye ~/.local/bin; sin esto, miri y cualquier binario
