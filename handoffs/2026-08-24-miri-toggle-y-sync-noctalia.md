@@ -125,9 +125,11 @@ aquí: el tema y su gestión viven en el repo `cursor-manager`.
 
 ## Pendientes
 
-- [ ] `hooks.colors_changed` usa `/home/kyu` hardcodeado mientras los hooks de
+- [x] ~~`hooks.colors_changed` usa `/home/kyu` hardcodeado mientras los hooks de
       batería usan `~`. Mismo patrón de portabilidad que el `ExecStartPost` de
-      `miri.service`.
+      `miri.service`.~~ **Resuelto 2026-08-27:** era falso positivo. En el repo
+      es el placeholder `"HOOK"`; `install.sh` lo sustituye. Ver README,
+      sección *Placeholders de rutas*.
 - [ ] Evaluar `noctalia completions` como bloque de `install.sh`.
 - [ ] Confirmar que `Mod+B` abre Zen tras `install.sh` desde cero.
 - [ ] Confirmar `miri.service` en login limpio en máquina nueva.

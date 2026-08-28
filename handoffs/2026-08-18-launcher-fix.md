@@ -75,3 +75,19 @@ Si se retoma la idea de offload de GPU (PRIME) al lanzar apps específicas, el w
 Exec=prime-run steam
 
 **No** en `launch_apps_custom_command`, que aplica de forma global e indiscriminada a todo lo que lanza el launcher/dock/taskbar.
+
+---
+
+## Actualización 2026-08-27
+
+**La lección de arriba quedó revertida a propósito.** El commit `77f4af4`
+(*feat(gpu): activar offload PRIME global via launch_apps_custom_command*)
+reactivó el wrapper global, esta vez con `noctaliaq-gpu-launch` ya existiendo
+en `~/.local/bin`. O sea: el setting sí se usa hoy, y ver
+`launch_apps_custom_command` con valor **no** es una regresión de este bug.
+
+El bug original era que el binario no existía, no el mecanismo en sí.
+
+Gotcha de rastreo: `git log -S` cuenta *ocurrencias* de la cadena, así que no
+detecta un cambio de valor de una key TOML — la key aparece una vez antes y
+después. Usar `-G` (regex sobre el diff).
