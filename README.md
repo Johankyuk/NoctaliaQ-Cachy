@@ -1,7 +1,7 @@
 # NoctaliaQ-Cachy
 
 Setup completo de Noctalia v5 + niri en CachyOS (KyuCachy). Config, scripts de GPU PRIME,
-color-sync de teclado/MangoHud, cursor Bibata, zsh (cachyos-zsh-config + p10k), foot y
+color-sync de teclado/MangoHud, cursor, zsh (cachyos-zsh-config + p10k), foot y
 overrides de MangoHud para flatpaks.
 
 ## Instalación rápida (cualquier máquina, sin llave SSH)
@@ -23,7 +23,9 @@ Todo archivo que reemplaza se respalda como `archivo.bak.<timestamp>` antes de s
 
 ## Qué instala `install.sh`
 
-- **Cursor** Bibata-Modern-Classic (tamaño 32) vía gsettings.
+- **Cursor**: paquete `capitaine-cursors`. El tema y el tamaño los gobierna
+  `config/niri/cfg/cursor.kdl` (fuente única). El tema activo es
+  `Skyrim-by-ru5tyshark-cursors`, instalación manual desde el repo `cursor-manager`.
 - **Noctalia**: `config.toml` completo (bar, dock, hooks, tema) + `kbd-color-sync.toml`
   (sat=1.6 val=0.85).
 - **MangoHud**: paquete + `MangoHud.conf` + overrides para Sober y mcpelauncher si están
@@ -37,6 +39,28 @@ Todo archivo que reemplaza se respalda como `archivo.bak.<timestamp>` antes de s
 - **Miri**: `config.toml` + servicio `systemd --user` (habilitado, arranca junto con niri).
 - **Scripts** de `bin/` → `~/.local/bin/` (kbd-color-sync, mangohud-color-sync,
   noctaliaq-gpu-prime, noctaliaq-gpu-launch, noctaliaq-gpu-flatpak-sync).
+
+## Placeholders de rutas
+
+Los archivos de `config/` no llevan rutas absolutas: `install.sh` las sustituye al
+desplegar, para que el repo funcione con cualquier usuario. Tres formas, cada una con
+su `sed` y su guardia que aborta si algo queda sin sustituir:
+
+| Placeholder | Archivos | Se reemplaza por |
+|---|---|---|
+| `"HOME/` | `noctalia/config.toml`, `noctalia/kbd-color-sync.toml` | `"$HOME/` |
+| `=HOME/` | `MangoHud/MangoHud.conf` | `=$HOME/` |
+| `"HOOK"` | `noctalia/config.toml` | ruta a `rgb-sync-hook.sh` |
+
+**Al editar estos archivos, nunca commitear rutas absolutas.** El `sed` de `config.toml`
+tiene además una red de seguridad (`s|/home/kyu/|$HOME/|g`) que los otros dos no tienen.
+
+Consecuencia para diagnóstico: un `diff` crudo entre `config/noctalia/config.toml` y
+`~/.config/noctalia/config.toml` siempre muestra estas líneas y no indica drift. Para
+comparar de verdad hay que normalizar primero con el mismo `sed` que aplica `install.sh`.
+
+Si se agrega un archivo nuevo con rutas, agregar las tres piezas: placeholder en el
+archivo, `sed` en `install.sh`, y `grep` que aborte.
 
 ## Módulos manuales (no los corre `install.sh`)
 
