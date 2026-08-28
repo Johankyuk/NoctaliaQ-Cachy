@@ -34,6 +34,12 @@ Todo archivo que reemplaza se respalda como `archivo.bak.<timestamp>` antes de s
 - **niri**: todos los `.kdl` de `config/niri/cfg/` + `config.kdl` (window-rules, blur).
 - **Zsh**: paquete + `cachyos-zsh-config` + zoxide + eza + `.zshrc`/`.p10k.zsh`, y cambia la
   shell por defecto del usuario (`chsh`, pide password del usuario).
+- **Completions de noctalia**: `noctalia completions zsh` →
+  `~/.local/share/zsh/site-functions/_noctalia`. Se generan del esquema vivo, así que
+  **incluyen los subcomandos de los plugins instalados en ese momento** — regenerar con
+  el mismo comando tras instalar o quitar plugins. El `zshrc` agrega ese directorio a
+  `fpath` antes de `cachyos-config.zsh`, que es quien corre `compinit`; si se mueve esa
+  línea después, las completions dejan de cargar en silencio.
 - **Foot**: paquete + config + tema dinámico Noctalia.
 - **Zen Browser**: paquete `zen-browser-bin` (repo `cachyos`, sin AUR).
 - **Miri**: `config.toml` + servicio `systemd --user` (habilitado, arranca junto con niri).
