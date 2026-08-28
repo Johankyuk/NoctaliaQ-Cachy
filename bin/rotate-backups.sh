@@ -9,7 +9,13 @@ if ! [[ $KEEP =~ ^[0-9]+$ ]]; then
     echo "uso: rotate-backups.sh [N]   (el script no acepta rutas)" >&2
     exit 2
 fi
-DIRS=("$HOME/.config/noctalia" "$HOME/.config/foot" "$HOME/.config/systemd/user" "$HOME/.local/state/noctalia" "$HOME/.config/niri/cfg")
+# raiz del repo, resuelta desde la ubicacion del script (bin/)
+REPO_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+
+# desplegados + repo. config/niri/cfg del repo se omite: es el destino del symlink
+# ~/.config/niri/cfg, ya cubierto arriba.
+DIRS=("$HOME/.config/noctalia" "$HOME/.config/foot" "$HOME/.config/systemd/user" "$HOME/.local/state/noctalia" "$HOME/.config/niri/cfg" \
+      "$REPO_DIR" "$REPO_DIR/bin" "$REPO_DIR/config/noctalia" "$REPO_DIR/config/systemd-user")
 
 for dir in "${DIRS[@]}"; do
     [[ -d $dir ]] || continue
