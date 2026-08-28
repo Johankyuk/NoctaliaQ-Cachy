@@ -194,7 +194,7 @@ show_running = true
 smart_auto_hide = true
 
 [hooks]
-battery_charging = []
+battery_charging = [ "HOME/.local/bin/noctaliaq-gpu-prime on" ]
 battery_discharging = [ "HOME/.local/bin/noctaliaq-gpu-prime off" ]
 battery_percentage_changed = []
 battery_plugged = [ "HOME/.local/bin/noctaliaq-gpu-prime on" ]
