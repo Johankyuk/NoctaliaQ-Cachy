@@ -122,6 +122,22 @@ else
   echo "zsh ya es la shell por defecto."
 fi
 
+echo "== Completions de zsh para noctalia =="
+# Se generan del esquema vivo e incluyen subcomandos de los plugins instalados.
+# Regenerar tras instalar/quitar plugins con el mismo comando.
+if command -v noctalia &>/dev/null; then
+  mkdir -p "$HOME/.local/share/zsh/site-functions"
+  if noctalia completions zsh > "$HOME/.local/share/zsh/site-functions/_noctalia" 2>/dev/null \
+     && head -1 "$HOME/.local/share/zsh/site-functions/_noctalia" | grep -q "^#compdef noctalia"; then
+    echo "completions instaladas."
+  else
+    rm -f "$HOME/.local/share/zsh/site-functions/_noctalia"
+    echo "WARN: noctalia completions fallo, se omite." >&2
+  fi
+else
+  echo "WARN: noctalia no encontrado, se omiten completions." >&2
+fi
+
 echo "== Foot (paquete + config + tema Noctalia) =="
 if ! pacman -Qi foot &>/dev/null; then
   sudo pacman -S --needed --noconfirm foot
