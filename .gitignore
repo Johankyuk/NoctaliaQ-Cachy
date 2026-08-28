@@ -2,3 +2,6 @@
 *.bak
 *.bak.*
 config/foot/themes/
+
+# El state de Noctalia lo reescribe el daemon; no se versiona.
+config/noctalia/settings.toml
