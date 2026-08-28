@@ -1,2 +1,2 @@
 [hooks]
-colors_changed = ["/home/kyu/.local/bin/kbd-color-sync --sat=1.6 --val=0.85", "/home/kyu/.local/bin/mangohud-color-sync"]
+colors_changed = ["HOME/.local/bin/kbd-color-sync --sat=1.6 --val=0.85", "HOME/.local/bin/mangohud-color-sync"]

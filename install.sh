@@ -52,6 +52,8 @@ echo "config.toml: rutas resueltas para $USER."
 backup_and_copy "$REPO_DIR/config/environment.d/10-path.conf" "$HOME/.config/environment.d/10-path.conf"
 
 backup_and_copy "$REPO_DIR/config/noctalia/kbd-color-sync.toml" "$HOME/.config/noctalia/kbd-color-sync.toml"
+sed -i "s|\"HOME/|\"$HOME/|g" "$HOME/.config/noctalia/kbd-color-sync.toml"
+grep -q '"HOME/' "$HOME/.config/noctalia/kbd-color-sync.toml" && { echo "ERROR: placeholder sin sustituir en kbd-color-sync.toml" >&2; exit 1; }
 
 echo "== MangoHud (paquete + config) =="
 if ! pacman -Qi mangohud &>/dev/null; then
@@ -60,6 +62,8 @@ else
   echo "mangohud ya instalado, se omite pacman."
 fi
 backup_and_copy "$REPO_DIR/config/MangoHud/MangoHud.conf" "$HOME/.config/MangoHud/MangoHud.conf"
+sed -i "s|=HOME/|=$HOME/|g" "$HOME/.config/MangoHud/MangoHud.conf"
+grep -q '=HOME/' "$HOME/.config/MangoHud/MangoHud.conf" && { echo "ERROR: placeholder sin sustituir en MangoHud.conf" >&2; exit 1; }
 
 echo "== MangoHud en flatpaks (Sober / mcpelauncher) =="
 if flatpak info org.vinegarhq.Sober &>/dev/null || flatpak info io.mrarm.mcpelauncher &>/dev/null; then

@@ -555,7 +555,7 @@ time_format = "{:%-I:%M:%S %p}"
     [shell.screenshot]
     confirm_region = true
     copy_to_clipboard = true
-    directory = "/home/kyu/Pictures/Screenshots"
+    directory = "HOME/Pictures/Screenshots"
     filename_pattern = ""
     freeze_screen = true
     pipe_command = ""
