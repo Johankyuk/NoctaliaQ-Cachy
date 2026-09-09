@@ -63,6 +63,7 @@ holders() {
   fi
 }
 
+STOPPED=()
 stop_nv_services() {
   local s
   STOPPED=()
@@ -74,11 +75,15 @@ stop_nv_services() {
 }
 
 start_nv_services() {
+  # solo lo que ESTE script paró. Arrancar los dos a ciegas dejaba
+  # nvidia-persistenced corriendo aunque no lo estuviera antes, y persistence
+  # mode impide que la dGPU duerma: fuga de batería silenciosa.
   local s
-  for s in nvidia-powerd nvidia-persistenced; do
-    systemctl list-unit-files "$s.service" >/dev/null 2>&1 || continue
+  for s in "${STOPPED[@]:-}"; do
+    [[ -n "$s" ]] || continue
     systemctl start "$s" 2>/dev/null && log "arrancado $s"
   done
+  [[ -n "${STOPPED[*]:-}" ]] || log "no había servicios NVIDIA parados por este script"
 }
 
 write_blacklist() {

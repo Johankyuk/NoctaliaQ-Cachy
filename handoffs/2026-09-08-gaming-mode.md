@@ -316,3 +316,20 @@ Observación, no pendiente.
 
 Nota de método: un simulacro de trap con el script en background no vale, un
 proceso asíncrono hereda SIGINT ignorado y el trap queda inerte. Probar con TERM.
+
+### Añadido 2026-09-08 — modo integrado: camino de error validado
+
+`noctaliaq-gpu-mode integrated` desde la sesión gráfica falla como debe y
+restaura el estado. Quienes retienen los módulos en esta máquina: `niri`,
+`noctalia` y el `RDD Process` del navegador. Hace falta cerrar sesión de
+verdad, no basta con cerrar ventanas.
+
+**Bug corregido: rearranque asimétrico de servicios NVIDIA.**
+`stop_nv_services` solo paraba lo que estaba activo (aquí, `nvidia-powerd`),
+pero `start_nv_services` arrancaba los dos a ciegas. Resultado:
+`nvidia-persistenced` quedaba corriendo aunque no lo estuviera antes, y
+persistence mode impide que la dGPU duerma — fuga de batería silenciosa.
+Ahora solo se rearranca lo que este script paró.
+
+Regla general: un script que para servicios para hacer su trabajo debe
+restaurar el estado previo, no un estado que asuma correcto.
