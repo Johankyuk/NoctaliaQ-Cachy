@@ -1,234 +1,516 @@
 #!/usr/bin/env bash
-# noctaliaq-gpu-mode — cambia entre gráficos híbridos y solo-iGPU sin
-#                      supergfxctl, optimus-manager ni nada de terceros.
+# noctaliaq-gpu-mode — modo GPU: Hibrida (iGPU + dGPU offload) / Integrada
+# (dGPU apagada por firmware).
 #
-#   noctaliaq-gpu-mode status
-#   noctaliaq-gpu-mode hybrid      [--persist]
-#   noctaliaq-gpu-mode integrated  [--persist] [--at-boot]
+# El cambio va por los atributos de firmware de asus-armoury, no por unbind
+# del dispositivo PCI en vivo:
 #
-#   --persist   sobrevive al reboot (blacklist en modprobe.d + unidad systemd)
-#   --at-boot   no intenta el cambio en caliente; solo lo deja armado
+#   /sys/class/firmware-attributes/asus-armoury/attributes/dgpu_disable
 #
-# El MUX (modo "ultimate"/dGPU-directa) queda deliberadamente fuera: exige
-# reboot por ACPI y deja el equipo sin salida de video si algo sale mal.
-
+# El firmware apaga la dGPU en el arranque, antes de que exista niri. Por eso
+# TODO cambio requiere reinicio — es limitacion del firmware, igual que con
+# rog-control-center.
+#
+# Precondicion critica para ir a Integrada: los modulos NVIDIA deben estar
+# descargados al escribir el nodo. Con la sesion grafica viva el firmware
+# rechaza con -EIO. De ahi el subcomando 'apply', que corre desde un TTY.
+# Volver a Hibrida no tiene esa restriccion: en Integrada no hay modulos.
+#
+# Verificacion de tres puntos en cada escritura (codigo de salida, relectura,
+# pending_reboot). El nodo MIENTE tras un write fallido: lee el valor nuevo
+# aunque el firmware lo haya rechazado.
+#
+#   noctaliaq-gpu-mode              wizard interactivo
+#   noctaliaq-gpu-mode status       estado (texto plano, una cosa por linea)
+#   noctaliaq-gpu-mode integrated   registra la intencion + instrucciones
+#   noctaliaq-gpu-mode hybrid       vuelve a Hibrida (directo, sin TTY)
+#   noctaliaq-gpu-mode apply        ejecuta el cambio pendiente (desde TTY)
+#
 set -uo pipefail
 
-TAG=noctaliaq-gpu-mode
-WMI=/sys/devices/platform/asus-nb-wmi
-STATE=/etc/noctaliaq/gpu-mode
-MODPROBE=/etc/modprobe.d/noctaliaq-gpu-mode.conf
-UNIT=noctaliaq-gpu-mode.service
+P='\033[0;35m'; G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'
+C='\033[0;36m'; D='\033[2m'; N='\033[0m'
+log(){  echo -e "${P}[gpu]${N} $1"; }
+# Rastro en el journal. Sin esto, un cambio de estado entre dos lecturas es
+# imposible de reconstruir despues (paso el 2026-09-09).
+jlog(){ command -v logger >/dev/null 2>&1 && logger -t noctaliaq-gpu-mode -- "$1"; }
+ok(){   echo -e "${G}[+]${N} $1"; }
+warn(){ echo -e "${Y}[i]${N} $1"; }
+err(){  echo -e "${R}[x]${N} $1" >&2; }
+
+ARMOURY=/sys/class/firmware-attributes/asus-armoury/attributes
+DGPU_NODE="$ARMOURY/dgpu_disable/current_value"
+DGPU_LEGACY=/sys/devices/platform/asus-nb-wmi/dgpu_disable
+PENDING="$ARMOURY/pending_reboot"
+[ -e "$DGPU_NODE" ] || DGPU_NODE="$DGPU_LEGACY"
+
+# NO usar $HOME: bajo systemd no esta definido y con 'set -u' aborta el script
+# en la primera linea que lo toque. /run es tmpfs (se limpia al reiniciar), que
+# es justo la vida util correcta para una intencion pendiente de aplicar.
+# /var/lib, no /run: el hook de apagado corre DESPUES de que /run pueda haberse
+# limpiado, y la intencion tiene que sobrevivir hasta ese momento.
+STATE_DIR=/var/lib/noctaliaq
+INTENT="$STATE_DIR/gpu-mode-intent"
+
 NV_MODULES=(nvidia_drm nvidia_modeset nvidia_uvm nvidia)
 
-log()  { logger -t "$TAG" -- "$*" 2>/dev/null; printf '%s\n' "$*"; }
-warn() { logger -t "$TAG" -p user.warning -- "$*" 2>/dev/null; printf 'aviso: %s\n' "$*" >&2; }
-die()  { logger -t "$TAG" -p user.err -- "$*" 2>/dev/null; printf 'error: %s\n' "$*" >&2; exit 1; }
+# ---------------------------------------------------------------- lectura ---
 
-need_root() {
-  [[ $EUID -eq 0 ]] && return 0
-  command -v pkexec >/dev/null 2>&1 || die "requiere root (y no hay pkexec)"
-  exec pkexec "$(realpath "$0")" "$@"
-}
-
-nvidia_pci() {
-  local d
-  for d in /sys/bus/pci/devices/*; do
-    [[ -r "$d/vendor" && -r "$d/class" ]] || continue
-    [[ "$(<"$d/vendor")" == "0x10de" && "$(<"$d/class")" == 0x0300* ]] || continue
-    printf '%s' "$d"; return 0
-  done
-  return 1
-}
-
-loaded_modules() {
-  local m out=()
-  for m in "${NV_MODULES[@]}"; do
-    grep -q "^${m} " /proc/modules && out+=("$m")
-  done
-  printf '%s\n' "${out[@]:-}"
-}
-
-holders() {
-  # quién impide descargar los módulos
-  local m refs users
-  for m in "${NV_MODULES[@]}"; do
-    read -r _ _ refs users _ < <(grep "^${m} " /proc/modules) || continue
-    [[ "${refs:-0}" != 0 ]] && printf '  %-16s usado por: %s\n' "$m" "$users"
-  done
-  if command -v fuser >/dev/null 2>&1; then
-    local procs
-    procs="$(fuser -v /dev/nvidia* 2>&1 | tail -n +2)"
-    [[ -n "$procs" ]] && printf '  procesos con /dev/nvidia* abierto:\n%s\n' "$procs"
-  fi
-}
-
-STOPPED=()
-stop_nv_services() {
-  local s
-  STOPPED=()
-  for s in nvidia-powerd nvidia-persistenced; do
-    if systemctl is-active --quiet "$s" 2>/dev/null; then
-      systemctl stop "$s" && STOPPED+=("$s") && log "detenido $s"
+# Modo REAL: se infiere del hardware, no del nodo. El nodo dice que se aplicara
+# en el proximo arranque; el hardware dice que hay ahora.
+_modo_actual(){
+    if [ -d /proc/driver/nvidia/gpus ] && \
+       [ -n "$(ls -A /proc/driver/nvidia/gpus 2>/dev/null)" ]; then
+        echo Hibrida; return
     fi
-  done
+    lspci -nn 2>/dev/null | grep -qi 'nvidia' && echo Hibrida || echo Integrada
 }
 
-start_nv_services() {
-  # solo lo que ESTE script paró. Arrancar los dos a ciegas dejaba
-  # nvidia-persistenced corriendo aunque no lo estuviera antes, y persistence
-  # mode impide que la dGPU duerma: fuga de batería silenciosa.
-  local s
-  for s in "${STOPPED[@]:-}"; do
-    [[ -n "$s" ]] || continue
-    systemctl start "$s" 2>/dev/null && log "arrancado $s"
-  done
-  [[ -n "${STOPPED[*]:-}" ]] || log "no había servicios NVIDIA parados por este script"
+_modo_pendiente(){
+    local v; v=$(cat "$DGPU_NODE" 2>/dev/null) || { echo '?'; return; }
+    case "$v" in 0) echo Hibrida ;; 1) echo Integrada ;; *) echo '?' ;; esac
 }
 
-write_blacklist() {
-  mkdir -p "${MODPROBE%/*}"
-  cat > "$MODPROBE" <<'EOF'
-# Generado por noctaliaq-gpu-mode. Borrar este archivo devuelve el modo híbrido.
-# nouveau va aquí también: si solo se bloquea nvidia, el kernel carga nouveau y
-# vuelve a encender la dGPU (bug conocido de supergfxctl, issue #175).
-blacklist nvidia
-blacklist nvidia_drm
-blacklist nvidia_modeset
-blacklist nvidia_uvm
-blacklist nouveau
-EOF
-  [[ -s "$MODPROBE" ]] || die "no pude escribir $MODPROBE"
-  grep -qc '^blacklist nouveau$' "$MODPROBE" || die "verificación de $MODPROBE falló"
-  log "blacklist escrita en $MODPROBE"
-
-  if grep -qE '^MODULES=.*nvidia' /etc/mkinitcpio.conf 2>/dev/null; then
-    warn "mkinitcpio.conf tiene nvidia en MODULES= : se cargan a la fuerza desde el"
-    warn "initramfs y la blacklist no los detiene. Quítalos de ahí y corre 'mkinitcpio -P'."
-  fi
+_modulos_cargados(){
+    local m
+    for m in "${NV_MODULES[@]}"; do
+        lsmod 2>/dev/null | grep -q "^${m//-/_} " && return 0
+    done
+    return 1
 }
 
-set_state() {
-  mkdir -p "${STATE%/*}"
-  printf '%s\n' "$1" > "$STATE"
-  [[ "$(<"$STATE")" == "$1" ]] || die "no pude persistir el estado en $STATE"
+_backlight_activo(){
+    local b
+    for b in /sys/class/backlight/*/; do
+        [ -e "$b" ] && { basename "$b"; return 0; }
+    done
+    echo "(ninguno)"
 }
 
-dgpu_off() {
-  if [[ -w "$WMI/dgpu_disable" ]]; then
-    printf '1' > "$WMI/dgpu_disable" || return 1
-    sleep 0.5
-    [[ "$(<"$WMI/dgpu_disable")" == 1 ]] || return 1
-    log "dgpu_disable = 1 (apagada por firmware ASUS)"
+_vatios(){
+    local c v
+    c=$(cat /sys/class/power_supply/BAT*/current_now 2>/dev/null | head -1) || return 1
+    v=$(cat /sys/class/power_supply/BAT*/voltage_now 2>/dev/null | head -1) || return 1
+    [ -n "$c" ] && [ -n "$v" ] || return 1
+    awk -v c="$c" -v v="$v" 'BEGIN{ printf "%.2f", c*v/1e12 }'
+}
+
+_en_ac(){
+    local p
+    for p in /sys/class/power_supply/*/online; do
+        [ -r "$p" ] && [ "$(cat "$p" 2>/dev/null)" = "1" ] && return 0
+    done
+    return 1
+}
+
+_sesion_grafica(){ _modulos_cargados; }
+
+# Una sola lectura consistente. El hardware puede cambiar entre dos llamadas
+# sueltas (hotplug PCIe del firmware), asi que quien decide y quien pinta
+# tienen que mirar la MISMA foto.
+_estado(){ # imprime "actual|pendiente|modulos|lspci"
+    local act pend mods n
+    act=$(_modo_actual); pend=$(_modo_pendiente)
+    _modulos_cargados && mods=si || mods=no
+    n=$(lspci -nn 2>/dev/null | grep -ci nvidia)
+    jlog "estado: actual=$act pendiente=$pend modulos=$mods lspci=$n"
+    echo "$act|$pend|$mods|$n"
+}
+
+# --------------------------------------------------------------- escritura ---
+
+# Verificacion de tres puntos. El nodo lee el valor nuevo aunque el firmware
+# haya rechazado la escritura, asi que la relectura sola no prueba nada.
+_escribir_dgpu(){ # $1 = 0|1
+    local destino="$1" rc leido pend
+
+    [ -e "$DGPU_NODE" ] || { err "No existe el nodo dgpu_disable — este equipo no expone asus-armoury."; return 1; }
+
+    # Releer AQUI, no confiar en lo que se leyo al pintar el menu. Entre una
+    # cosa y otra udev puede haber cargado los modulos tras un hotplug.
+    if [ "$destino" = 1 ] && _modulos_cargados; then
+        err "Los modulos NVIDIA estan cargados: el firmware rechazara el apagado."
+        err "Corre esto desde un TTY con greetd parado ('noctaliaq-gpu-mode apply')."
+        jlog "abortado: modulos cargados al momento de escribir destino=1"
+        return 1
+    fi
+
+    jlog "escribiendo dgpu_disable=$destino (nodo lee $(cat "$DGPU_NODE" 2>/dev/null))"
+
+    if [ "$(cat "$DGPU_NODE" 2>/dev/null)" = "$destino" ] && \
+       [ "$(cat "$PENDING" 2>/dev/null || echo 0)" = "0" ]; then
+        ok "El nodo ya esta en $destino y no hay nada encolado."
+        return 0
+    fi
+
+    echo "$destino" | sudo tee "$DGPU_NODE" >/dev/null 2>&1
+    rc=$?
+    leido=$(cat "$DGPU_NODE" 2>/dev/null)
+    pend=$(cat "$PENDING" 2>/dev/null || echo '?')
+
+    if [ "$rc" -ne 0 ]; then
+        err "El firmware rechazo la escritura (rc=$rc)."
+        jlog "RECHAZO rc=$rc leido=$leido pending=$pend destino=$destino"
+        warn "El nodo lee '$leido', pero eso NO significa que se haya aplicado."
+        journalctl -k --since '1 min ago' --no-pager 2>/dev/null | grep -i armoury | tail -3
+        _limpiar_nodo "$([ "$destino" = 1 ] && echo 0 || echo 1)"
+        return 1
+    fi
+
+    if [ "$leido" != "$destino" ]; then
+        err "Write aceptado pero el nodo lee '$leido' en vez de '$destino'."
+        return 1
+    fi
+
+    if [ "$pend" = "0" ]; then
+        err "Write aceptado y el nodo lee '$destino', pero pending_reboot sigue en 0."
+        warn "El firmware no encolo el cambio. Reiniciar no serviria de nada."
+        return 1
+    fi
+
+    ok "Escrito dgpu_disable=$destino  (pending_reboot=$pend)"
+    jlog "OK dgpu_disable=$destino pending_reboot=$pend"
     return 0
-  fi
-  local dev
-  dev="$(nvidia_pci)" || { log "la dGPU ya no está en el bus"; return 0; }
-  printf '1' > "$dev/remove" || return 1
-  sleep 0.5
-  log "dGPU removida del bus PCI (${dev##*/})"
 }
 
-dgpu_on() {
-  if [[ -w "$WMI/dgpu_disable" ]]; then
-    printf '0' > "$WMI/dgpu_disable" || warn "no pude escribir dgpu_disable"
-    sleep 0.5
-  fi
-  printf '1' > /sys/bus/pci/rescan 2>/dev/null
-  sleep 1
-  nvidia_pci >/dev/null || { sleep 2; printf '1' > /sys/bus/pci/rescan 2>/dev/null; sleep 1; }
-  nvidia_pci >/dev/null || return 1
-  log "dGPU presente en el bus"
+# Tras un rechazo el nodo queda con el valor que no se aplico. Devolverlo a su
+# valor real evita reiniciar con estado sucio.
+_limpiar_nodo(){ # $1 = valor real
+    echo "$1" | sudo tee "$DGPU_NODE" >/dev/null 2>&1 && \
+        log "Nodo devuelto a $1 (estado real)."
 }
 
-cmd_status() {
-  printf 'estado guardado : %s\n' "$( [[ -r $STATE ]] && cat "$STATE" || echo '(sin fijar)' )"
-  printf 'blacklist       : %s\n' "$( [[ -f $MODPROBE ]] && echo "presente ($MODPROBE)" || echo ausente )"
-  if [[ -r "$WMI/dgpu_disable" ]]; then
-    printf 'dgpu_disable    : %s\n' "$(<"$WMI/dgpu_disable")"
-  else
-    printf 'dgpu_disable    : no expuesto por asus-nb-wmi (se usará remove/rescan PCI)\n'
-  fi
-  if [[ -r "$WMI/gpu_mux_mode" ]]; then
-    printf 'gpu_mux_mode    : %s (1 = Optimus/híbrido, 0 = MUX a dGPU)\n' "$(<"$WMI/gpu_mux_mode")"
-  fi
-  local dev
-  if dev="$(nvidia_pci)"; then
-    printf 'dGPU en bus     : sí (%s) runtime=%s/%s  potencia=%s\n' "${dev##*/}" \
-      "$(cat "$dev/power/control" 2>/dev/null || echo '?')" \
-      "$(cat "$dev/power/runtime_status" 2>/dev/null || echo '?')" \
-      "$(cat "$dev/power_state" 2>/dev/null || echo '?')"
-  else
-    printf 'dGPU en bus     : no\n'
-  fi
-  local mods; mapfile -t mods < <(loaded_modules)
-  printf 'módulos         : %s\n' "$( [[ -n ${mods[*]:-} ]] && echo "${mods[*]}" || echo ninguno )"
-  command -v nvidia-smi >/dev/null 2>&1 && nvidia-smi -L 2>/dev/null | sed 's/^/                  /'
-  return 0
+_ofrecer_reboot(){
+    [ -t 0 ] || { warn "Reinicia para aplicar."; return 0; }
+    local r
+    read -rp "  ¿Reiniciar ahora? [s/N] " r
+    case "$r" in [sS]) log "Reiniciando..."; systemctl reboot ;;
+                 *) warn "Cambio encolado; aplica en el proximo reinicio." ;; esac
 }
 
-cmd_integrated() {
-  local persist=0 atboot=0 a
-  for a in "$@"; do
-    [[ "$a" == --persist ]] && persist=1
-    [[ "$a" == --at-boot ]] && { atboot=1; persist=1; }
-  done
+# ------------------------------------------------------------- subcomandos ---
 
-  if (( ! atboot )); then
-    stop_nv_services
-    if [[ -n "$(loaded_modules)" ]]; then
-      modprobe -r "${NV_MODULES[@]}" 2>/dev/null
-      sleep 0.5
+cmd_status(){
+    local act pend bl w
+    act=$(_modo_actual); pend=$(_modo_pendiente)
+    if [ "$act" = "$pend" ]; then echo "Modo GPU:   $act"
+    else echo "Modo GPU:   $act -> $pend (tras reinicio)"; fi
+    echo "dgpu_disable: $(cat "$DGPU_NODE" 2>/dev/null || echo '?')"
+    echo "pending_reboot: $(cat "$PENDING" 2>/dev/null || echo 'n/a')"
+    echo "Modulos NVIDIA: $(_modulos_cargados && echo cargados || echo ninguno)"
+    bl=$(_backlight_activo); echo "Backlight:  $bl"
+    if [ "$act" = Integrada ] && [[ "$bl" != amdgpu_bl* ]]; then
+        warn "En Integrada el backlight EC no mueve el panel."
+        warn "Falta acpi_backlight=native en la cmdline (ver tools/ensure-backlight-native.sh)."
     fi
-    if [[ -n "$(loaded_modules)" ]]; then
-      printf 'no pude descargar los módulos NVIDIA. Quién los retiene:\n' >&2
-      holders >&2
-      printf '\nLa sesión gráfica suele ser la culpable. Opciones:\n' >&2
-      printf '  - cerrar sesión y correr esto desde un TTY (Ctrl+Alt+F2), o\n' >&2
-      printf '  - %s integrated --at-boot   (lo deja armado para el próximo arranque)\n' "${0##*/}" >&2
-      start_nv_services
-      exit 1
+    _en_ac && echo "AC:         conectado" || echo "AC:         bateria"
+    w=$(_vatios) && echo "Consumo:    ${w} W"
+    [ -s "$INTENT" ] && echo "Intencion pendiente: $(cat "$INTENT")"
+    return 0
+}
+
+cmd_integrated(){
+    local act; act=$(_modo_actual)
+    [ "$act" = Integrada ] && { ok "Ya estas en Integrada."; return 0; }
+
+    if ! _sesion_grafica; then
+        log "Sin modulos NVIDIA cargados — se puede aplicar aqui mismo."
+        cmd_apply_now Integrada
+        return $?
     fi
-    dgpu_off || die "no pude apagar la dGPU"
-  fi
 
-  if (( persist )); then
-    write_blacklist
-    set_state integrated
-    systemctl enable "$UNIT" >/dev/null 2>&1 && log "$UNIT habilitada"
-  fi
-  (( atboot )) && log "modo integrado armado para el próximo arranque" \
-                || log "modo integrado activo$( (( persist )) && echo ' y persistente' )"
+    sudo install -d -m 0755 "$STATE_DIR" && echo Integrada | sudo tee "$INTENT" >/dev/null
+    [ -s "$INTENT" ] || { err "No se pudo registrar la intencion en $INTENT"; return 1; }
+    echo ""
+    warn "La dGPU quedara apagada: sin CUDA, sin PRIME offload."
+    echo ""
+    if systemctl is-enabled noctaliaq-gpu-apply.service >/dev/null 2>&1; then
+        echo -e "  Se aplicara en el proximo apagado o reinicio."
+    else
+        echo -e "  El firmware rechaza el cambio mientras la sesion grafica tenga"
+        echo -e "  los modulos NVIDIA. Hay que hacerlo desde un TTY:"
+        echo ""
+        echo -e "    ${C}1.${N} Cierra sesion."
+        echo -e "    ${C}2.${N} ${C}Ctrl+Alt+F2${N} e inicia sesion en la consola."
+        echo -e "    ${C}3.${N} ${C}noctaliaq-gpu-mode apply${N}"
+    fi
+    echo ""
+    log "Intencion registrada. Nada se ha escrito todavia."
+
+    if [ -t 0 ] && systemctl is-enabled noctaliaq-gpu-apply.service >/dev/null 2>&1; then
+        echo ""
+        echo -e "  El cambio se aplica solo durante el apagado, cuando ya no hay"
+        echo -e "  sesion ni modulos cargados. ${D}No hace falta TTY.${N}"
+        local r
+        read -rp "  ¿Reiniciar ahora para aplicarlo? [s/N] " r
+        case "$r" in
+            [sS]) jlog "wizard: reiniciando con intencion Integrada"
+                  systemctl reboot ;;
+            *)    log "Se aplicara en el proximo reinicio." ;;
+        esac
+    fi
+    return 0
 }
 
-cmd_hybrid() {
-  local persist=0 a
-  for a in "$@"; do [[ "$a" == --persist ]] && persist=1; done
-
-  [[ -f "$MODPROBE" ]] && { rm -f "$MODPROBE"; log "blacklist eliminada"; }
-  dgpu_on || die "la dGPU no reapareció en el bus PCI — hace falta reiniciar"
-
-  modprobe nvidia 2>/dev/null && modprobe nvidia_modeset 2>/dev/null
-  modprobe nvidia_uvm 2>/dev/null; modprobe nvidia_drm 2>/dev/null
-  sleep 0.5
-  [[ -n "$(loaded_modules)" ]] || warn "los módulos no cargaron; puede requerir reinicio"
-  start_nv_services
-
-  if command -v nvidia-smi >/dev/null 2>&1; then
-    nvidia-smi -L >/dev/null 2>&1 && log "nvidia-smi responde: $(nvidia-smi -L | head -1)" \
-                                  || warn "nvidia-smi no responde todavía"
-  fi
-  (( persist )) && { set_state hybrid; systemctl disable "$UNIT" >/dev/null 2>&1; }
-  log "modo híbrido activo"
+cmd_hybrid(){
+    local act; act=$(_modo_actual)
+    [ "$act" = Hibrida ] && { ok "Ya estas en Hibrida."; sudo rm -f "$INTENT" 2>/dev/null || rm -f "$INTENT" 2>/dev/null; return 0; }
+    # Volver no necesita TTY: en Integrada no hay modulos que descargar.
+    _escribir_dgpu 0 || return 1
+    sudo rm -f "$INTENT" 2>/dev/null || rm -f "$INTENT" 2>/dev/null
+    ok "Modo GPU -> Hibrida. Reinicia para aplicar."
+    _ofrecer_reboot
+    return 0
 }
 
-case "${1:-status}" in
-  status) cmd_status ;;
-  integrated) need_root "$@"; shift; cmd_integrated "$@" ;;
-  hybrid)     need_root "$@"; shift; cmd_hybrid "$@" ;;
-  boot-apply) # usado por la unidad systemd, no por humanos
-    need_root "$@"
-    [[ -r "$STATE" && "$(<"$STATE")" == integrated ]] && dgpu_off
-    ;;
-  *) printf 'uso: %s {status|hybrid|integrated} [--persist] [--at-boot]\n' "${0##*/}" >&2; exit 1 ;;
+# Escritura sin sesion grafica de por medio. No para greetd ni descarga nada:
+# asume que ya no hay modulos.
+cmd_apply_now(){ # $1 = Integrada|Hibrida
+    local destino; [ "$1" = Integrada ] && destino=1 || destino=0
+    _escribir_dgpu "$destino" || return 1
+    sudo rm -f "$INTENT" 2>/dev/null || rm -f "$INTENT" 2>/dev/null
+    ok "Modo GPU -> $1. Reinicia para aplicar."
+    _ofrecer_reboot
+    return 0
+}
+
+# En modo --system corre desde una unidad systemd: sin TTY, sin nadie mirando.
+# Nunca pregunta, siempre deja rastro, y en cualquier fallo devuelve greetd.
+_recuperar_greetd(){
+    jlog "recuperando: systemctl start greetd"
+    sudo systemctl start greetd 2>/dev/null || systemctl start greetd 2>/dev/null
+}
+
+# greetd lanza niri via PAM, no por el gestor de usuario de systemd: pararlo no
+# se lleva el compositor por delante. Terminar el asiento si lo hace.
+_terminar_sesiones(){
+    local s_ leader
+    for s_ in $(loginctl list-sessions --no-legend 2>/dev/null | awk '$NF=="tty1" || $5=="user" {print $1}'); do
+        jlog "terminando sesion $s_"
+        loginctl terminate-session "$s_" 2>/dev/null
+    done
+    loginctl terminate-seat seat0 2>/dev/null
+    sleep 2
+    # Red final: cualquier niri que siga en pie tras terminar el asiento.
+    for leader in $(pgrep -x niri 2>/dev/null); do
+        jlog "niri $leader sigue vivo tras terminate-seat; SIGTERM"
+        kill -TERM "$leader" 2>/dev/null
+    done
+    sleep 1
+}
+
+# greetd tarda en soltar los fds aunque systemd ya lo diera por parado.
+_descargar_modulos(){ # $1 = intentos
+    local i="${1:-10}" sudo_=""
+    [ "$(id -u)" != 0 ] && sudo_=sudo
+    while [ "$i" -gt 0 ]; do
+        _modulos_cargados || { ok "Modulos fuera."; return 0; }
+        $sudo_ modprobe -r "${NV_MODULES[@]}" 2>/dev/null && { ok "Modulos fuera."; return 0; }
+        i=$((i-1)); sleep 1
+    done
+    err "No se pudieron descargar los modulos NVIDIA. Quien los retiene:"
+    $sudo_ fuser -v /dev/nvidia* 2>&1 | sed 's/^/    /'
+    jlog "fallo: modulos retenidos tras reintentos"
+    return 1
+}
+
+# Corre desde ExecStop de la unidad, durante el apagado: greetd y niri ya estan
+# abajo, journald sigue vivo y la raiz sigue escribible. Nunca reinicia (el
+# apagado ya esta en curso) y nunca toca greetd (ya no existe).
+cmd_apply_shutdown(){
+    local objetivo
+    objetivo=$(cat "$INTENT" 2>/dev/null)
+    [ -n "$objetivo" ] || exit 0
+
+    # journald se apaga antes de que terminemos: sus ultimas lineas se pierden.
+    # La raiz sigue escribible en este punto, asi que el veredicto va a disco.
+    LOG=/var/lib/noctaliaq/last-apply.log
+    mkdir -p /var/lib/noctaliaq 2>/dev/null
+    exec > >(while IFS= read -r l; do
+                 printf '%s %s\n' "$(date '+%H:%M:%S')" "$l" | tee -a "$LOG"
+             done) 2>&1
+    echo "=== apply --shutdown $(date '+%Y-%m-%d %H:%M:%S') ==="
+
+    echo "intencion: $objetivo"
+    rm -f "$INTENT"
+
+    local destino
+    case "$objetivo" in
+        Integrada) destino=1 ;;
+        Hibrida)   destino=0 ;;
+        *) echo "intencion desconocida, no se hace nada"; exit 0 ;;
+    esac
+
+    if _modulos_cargados; then
+        echo "descargando modulos NVIDIA"
+        modprobe -r "${NV_MODULES[@]}" 2>&1 || true
+    fi
+    if _modulos_cargados; then
+        echo "los modulos siguen cargados; el firmware rechazara. Quien retiene:"
+        fuser -v /dev/nvidia* 2>&1 || true
+        exit 0
+    fi
+
+    local actual leido pend
+    actual=$(cat "$DGPU_NODE" 2>/dev/null)
+    if echo "$destino" > "$DGPU_NODE" 2>/dev/null; then
+        leido=$(cat "$DGPU_NODE" 2>/dev/null)
+        pend=$(cat "$PENDING" 2>/dev/null || echo '?')
+        # Criterio: el write devolvio exito Y el nodo lee el destino. NO se
+        # exige pending_reboot=1 aqui — se observo que al apagar puede quedar
+        # en 0 aunque el cambio sea valido, y revertir por eso tiraba cambios
+        # buenos. En el camino interactivo (_escribir_dgpu) si se exige, porque
+        # ahi hay alguien mirando y el coste de un falso positivo es cero.
+        if [ "$leido" = "$destino" ]; then
+            echo "OK dgpu_disable=$destino (pending_reboot=$pend) -> $objetivo"
+            [ "$pend" = 0 ] && echo "  nota: pending_reboot en 0; si al arrancar sigues en $actual, el firmware lo ignoro"
+        else
+            echo "RECHAZO leido=$leido pending=$pend; devolviendo a $actual"
+            echo "$actual" > "$DGPU_NODE" 2>/dev/null
+        fi
+    else
+        echo "el firmware rechazo la escritura; se queda en $actual"
+        echo "$actual" > "$DGPU_NODE" 2>/dev/null
+    fi
+    echo "=== fin ==="
+    exec >&- 2>&-
+    wait
+    exit 0
+}
+
+cmd_apply_system(){
+    local objetivo
+    objetivo=$(cat "$INTENT" 2>/dev/null)
+    jlog "apply --system: intencion='$objetivo'"
+
+    if [ "$objetivo" != Integrada ]; then
+        err "Sin intencion 'Integrada' registrada (leido: '${objetivo:-vacio}'). No se hace nada."
+        _recuperar_greetd
+        return 1
+    fi
+
+    # Conflicts=greetd NO basta. greetd lanza niri por PAM, fuera del gestor de
+    # usuario de systemd: parar la unidad deja el compositor huerfano, vivo, y
+    # reteniendo /dev/nvidia*. Hay que terminar la sesion explicitamente.
+    _terminar_sesiones
+
+    _descargar_modulos 15 || { _recuperar_greetd; return 1; }
+
+    if ! _escribir_dgpu 1; then
+        err "El firmware rechazo el apagado. Se queda en Hibrida."
+        _recuperar_greetd
+        return 1
+    fi
+
+    sudo rm -f "$INTENT" 2>/dev/null || rm -f "$INTENT" 2>/dev/null
+    ok "Modo GPU -> Integrada. Reiniciando..."
+    jlog "exito: reiniciando para aplicar Integrada"
+    systemctl reboot
+    return 0
+}
+
+cmd_apply(){
+    local objetivo m
+    objetivo=$(cat "$INTENT" 2>/dev/null)
+    [ -n "$objetivo" ] || { err "No hay ninguna intencion registrada. Corre 'noctaliaq-gpu-mode integrated' primero."; return 1; }
+    log "Intencion registrada: $objetivo"
+
+    if [ "$objetivo" = Hibrida ]; then cmd_apply_now Hibrida; return $?; fi
+
+    if ! _sesion_grafica; then cmd_apply_now Integrada; return $?; fi
+
+    if [ -n "${WAYLAND_DISPLAY:-}${DISPLAY:-}" ]; then
+        err "Esto corre desde un TTY, no desde la sesion grafica."
+        err "Cierra sesion, Ctrl+Alt+F2, y vuelve a correrlo."
+        return 1
+    fi
+
+    log "Parando greetd..."
+    sudo systemctl stop greetd || { err "No se pudo parar greetd."; return 1; }
+    sleep 2
+
+    log "Descargando modulos NVIDIA..."
+    if ! sudo modprobe -r "${NV_MODULES[@]}" 2>/dev/null; then
+        err "No se pudieron descargar los modulos. Quien los retiene:"
+        sudo fuser -v /dev/nvidia* 2>&1 | sed 's/^/    /'
+        warn "Recupera con: sudo systemctl start greetd"
+        return 1
+    fi
+    ok "Modulos fuera."
+
+    if ! _escribir_dgpu 1; then
+        warn "Recupera con: sudo systemctl start greetd"
+        return 1
+    fi
+
+    sudo rm -f "$INTENT" 2>/dev/null || rm -f "$INTENT" 2>/dev/null
+    ok "Modo GPU -> Integrada. Reinicia para aplicar."
+    _ofrecer_reboot
+    return 0
+}
+
+# ----------------------------------------------------------------- wizard ---
+
+_pausa(){ echo ""; read -rsn1 -p "$(echo -e "  ${D}[cualquier tecla]${N}")"; echo ""; }
+
+cmd_wizard(){
+    [ -t 0 ] || { cmd_status; return 0; }
+    local opt foto act pend mods g1 g2 m1 m2
+    while true; do
+        # Una sola foto por vuelta: el marcador y la accion miran lo mismo.
+        foto=$(_estado)
+        act=${foto%%|*}; foto=${foto#*|}
+        pend=${foto%%|*}; foto=${foto#*|}
+        mods=${foto%%|*}
+
+        # El marcador va sobre el modo REAL, no sobre el pendiente. Confundir
+        # los dos hace que el menu senale una fila y actue sobre otra.
+        [ "$act" = Hibrida ]   && g1="●" || g1="○"
+        [ "$act" = Integrada ] && g2="●" || g2="○"
+        m1=""; m2=""
+        [ "$pend" = Hibrida ]   && [ "$act" != Hibrida ]   && m1=" ${Y}⟳${N}"
+        [ "$pend" = Integrada ] && [ "$act" != Integrada ] && m2=" ${Y}⟳${N}"
+
+        printf '\033[2J\033[H'
+        echo -e "  ${P}NoctaliaQ · Modo GPU${N}"
+        echo -e "  ${D}──────────────────────────────────────────────${N}"
+        echo -e "  Modo actual  ${C}${act}${N}   ${D}(● = activo ahora, ⟳ = tras reiniciar)${N}"
+        [ "$act" != "$pend" ] && echo -e "  ${Y}Hay un cambio encolado: ${pend}${N}"
+        [ "$mods" = si ] && echo -e "  ${D}modulos NVIDIA cargados${N}"
+        echo ""
+        echo -e "   ${g1} ${C}1${N}  Hibrida${m1}     ${D}iGPU + dGPU para offload: uso normal${N}"
+        echo -e "   ${g2} ${C}2${N}  Integrada${m2}   ${D}dGPU apagada por firmware, ~3.8 W menos${N}"
+        echo ""
+        echo -e "     ${C}s${N}  Estado detallado"
+        echo -e "     ${C}0${N}  Salir"
+        echo ""
+        read -rsn1 -p "$(echo -e "  ${P}>${N} ")" opt; echo ""
+        case "$opt" in
+            1) jlog "wizard: tecla 1 (Hibrida) con act=$act pend=$pend"; cmd_hybrid; _pausa ;;
+            2) jlog "wizard: tecla 2 (Integrada) con act=$act pend=$pend"; cmd_integrated; _pausa ;;
+            s|S) echo ""; cmd_status; _pausa ;;
+            0|q|Q) printf '\033[2J\033[H'; return 0 ;;
+        esac
+    done
+}
+
+# ------------------------------------------------------------------ main ---
+
+case "${1:-}" in
+    status)                   cmd_status ;;
+    integrated|integrada|igpu) cmd_integrated ;;
+    hybrid|hibrida)           cmd_hybrid ;;
+    apply)
+        case "${2:-}" in
+            --shutdown) cmd_apply_shutdown ;;
+            --system)   cmd_apply_system ;;
+            *)          cmd_apply ;;
+        esac ;;
+    --help|-h)
+        echo "uso: noctaliaq-gpu-mode [status|integrated|hybrid|apply]"
+        echo "  sin argumentos: wizard interactivo"
+        echo "  apply --system: modo desatendido, para noctaliaq-gpu-apply.service" ;;
+    "")                       cmd_wizard ;;
+    *) err "opcion desconocida: $1"
+       echo "uso: noctaliaq-gpu-mode [status|integrated|hybrid|apply]"; exit 1 ;;
 esac

@@ -1,20 +1,24 @@
 [Desktop Entry]
 Type=Application
-Name=Modo de gráficos
-Name[en]=Graphics mode
-Comment=Cambia entre híbrido y solo iGPU (pide autenticación)
-Comment[en]=Switch between hybrid and iGPU-only (asks for authentication)
-Exec=/usr/local/bin/noctaliaq-hold /usr/local/bin/noctaliaq-gpu-mode status
-Icon=video-display
+Name=NoctaliaQ: Modo GPU
+Name[en]=NoctaliaQ: GPU mode
+Comment=Cambiar entre GPU hibrida e integrada (requiere reinicio)
+Comment[en]=Switch between hybrid and integrated GPU (reboot required)
+Exec=/usr/local/bin/noctaliaq-hold /usr/local/bin/noctaliaq-gpu-mode
+Icon=preferences-desktop-display
 Terminal=true
 Categories=System;Settings;HardwareSettings;
-Keywords=gpu;grafica;graficos;nvidia;hibrido;integrado;dgpu;igpu;optimus;bateria;
-Actions=hybrid;integrated;
+Keywords=gpu;nvidia;dgpu;hibrida;integrada;bateria;prime;offload;modo;
+Actions=status;hybrid;integrated;
+
+[Desktop Action status]
+Name=Ver estado
+Exec=/usr/local/bin/noctaliaq-hold /usr/local/bin/noctaliaq-gpu-mode status
 
 [Desktop Action hybrid]
-Name=Cambiar a híbrido
-Exec=/usr/local/bin/noctaliaq-hold /usr/local/bin/noctaliaq-gpu-mode hybrid --persist
+Name=Cambiar a Hibrida
+Exec=/usr/local/bin/noctaliaq-hold /usr/local/bin/noctaliaq-gpu-mode hybrid
 
 [Desktop Action integrated]
-Name=Cambiar a solo iGPU
-Exec=/usr/local/bin/noctaliaq-hold /usr/local/bin/noctaliaq-gpu-mode integrated --persist
+Name=Cambiar a Integrada
+Exec=/usr/local/bin/noctaliaq-hold /usr/local/bin/noctaliaq-gpu-mode integrated

@@ -1,0 +1,32 @@
+[Unit]
+Description=NoctaliaQ: aplicar cambio de modo GPU al apagar
+Documentation=file:///usr/local/bin/noctaliaq-gpu-mode
+# Se arranca al inicio sin hacer nada; el trabajo real esta en ExecStop, que
+# systemd ejecuta durante el apagado. A diferencia de un script en
+# system-shutdown/, aqui journald sigue vivo y la raiz sigue escribible: se
+# puede ver que paso y borrar la intencion consumida.
+#
+# Before=greetd.service se lee al reves en el apagado: las unidades se paran en
+# orden inverso, asi que esto garantiza que nuestro ExecStop corre DESPUES de
+# que greetd (y con el, niri) ya esten abajo.
+# niri no es hijo de greetd a ojos de systemd (lo lanza por PAM), asi que
+# ordenar solo contra greetd.service no espera a nadie: el compositor sigue
+# vivo reteniendo /dev/nvidia*. Hay que dejar caer la sesion de usuario.
+# niri no es hijo de greetd a ojos de systemd (lo lanza por PAM), asi que
+# ordenar solo contra greetd.service no espera a nadie: el compositor sigue
+# vivo reteniendo /dev/nvidia*. Hay que dejar caer la sesion de usuario.
+Before=greetd.service display-manager.service systemd-user-sessions.service user.slice
+DefaultDependencies=no
+After=local-fs.target
+Requires=local-fs.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/true
+ExecStop=/usr/local/bin/noctaliaq-gpu-mode apply --shutdown
+TimeoutStopSec=60
+SyslogIdentifier=noctaliaq-gpu-apply
+
+[Install]
+WantedBy=multi-user.target
