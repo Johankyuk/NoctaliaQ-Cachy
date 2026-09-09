@@ -333,3 +333,58 @@ Ahora solo se rearranca lo que este script paró.
 
 Regla general: un script que para servicios para hacer su trabajo debe
 restaurar el estado previo, no un estado que asuma correcto.
+
+### Añadido 2026-09-08 — por qué la dGPU nunca duerme
+
+Investigación que salió al intentar activar D3cold. El hallazgo invalida la
+recomendación que se había dado antes en este mismo documento.
+
+**La dGPU no duerme nunca.** En un arranque de ~6 h:
+
+```
+runtime_active_time    : 21898939 ms  (~6 h)
+runtime_suspended_time :     2600 ms  (2.6 s)
+```
+
+**Culpable: niri.** Por eliminación, en batería, con el navegador cerrado:
+se paró `nvidia-powerd` (soltó, sigue D0), se mató `noctalia` (soltó, sigue
+D0), y quedó solo `niri` con `/dev/nvidia0`, `/dev/nvidiactl` y
+`/dev/nvidia-modeset` (este con mmap). Con `nvidia_drm.modeset=1` la dGPU se
+presenta como dispositivo DRM y el compositor la enumera al arrancar aunque
+renderice sobre la Radeon 740M. Es el precio de tener PRIME en Wayland: un
+trueque, no un bug.
+
+**Coste medido: 2.08 W** (`nvidia-smi`, 43 °C, 0 % de uso) sobre 11.46 W de
+consumo total en batería. Un 18 %, unos 20-30 min de autonomía.
+
+#### Dos vías probadas y descartadas
+
+- **`NVreg_DynamicPowerManagement=0x02` (D3cold).** Nunca se llegó a aplicar:
+  es una política para cuando la GPU está ociosa, y aquí jamás lo está. No
+  habría cambiado nada. Descartado antes de tocar `modprobe.d`.
+- **`render-drm-device` en el bloque `debug` de niri.** `niri validate` la
+  acepta (niri 26.04), pero tras reiniciar sesión `niri` seguía con
+  `/dev/nvidia-modeset` abierto y la GPU en D0. **Solo elige dónde renderiza,
+  no impide la enumeración.** `prime-run` siguió funcionando. Revertido.
+
+**Queda el modo integrado como única vía real** para recuperar esos 2 W: saca
+la GPU del bus y ningún cliente puede abrirla. Sigue con el riesgo del brillo
+por `nvidia_wmi_ec_backlight`.
+
+#### Notas sueltas
+
+- `~/.config/niri/cfg/` es un **symlink al repo**: editar el repo es editar lo
+  desplegado, no hay paso de despliegue. Explica que `find` sin `-L` se lo salte.
+- `BAT1` no expone `power_now`; hay que calcular con `current_now` ×
+  `voltage_now` / 1e12.
+- Medir watts justo después de un `pkill -9` da basura (16.31 W frente a
+  11.46 W reales): la pantalla se redibuja y contamina la lectura.
+
+### Pendiente único
+
+- [ ] **Probar el modo integrado.** Camino de error ya validado. Falta la ruta
+      feliz: cerrar sesión desde Noctalia, Ctrl+Alt+F2, `sudo systemctl stop
+      greetd`, `sudo fuser -v /dev/nvidia*` hasta que salga vacío,
+      `noctaliaq-gpu-mode integrated` **sin `--persist`**, `status`,
+      `sudo systemctl start greetd`, entrar y probar el brillo. Cualquier
+      reinicio revierte. Decidir después si compensa 2.08 W.
