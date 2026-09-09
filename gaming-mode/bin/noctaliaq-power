@@ -28,7 +28,9 @@ die()  { logger -t "$TAG" -p user.err -- "$*" 2>/dev/null; printf 'error: %s\n' 
 # --- config ----------------------------------------------------------------
 resolve_conf() {
   local c
-  for c in "${NOCTALIAQ_POWER_CONF:-}" "$HOME/.config/noctaliaq/power.conf" \
+  # ${HOME:-} y no $HOME: systemd-sleep ejecuta los hooks sin HOME, y con
+  # `set -u` eso abortaba la función antes de llegar al candidato de /etc
+  for c in "${NOCTALIAQ_POWER_CONF:-}" "${HOME:-}/.config/noctaliaq/power.conf" \
            /etc/noctaliaq/power.conf; do
     [[ -n "$c" && -r "$c" ]] && { printf '%s' "$c"; return 0; }
   done

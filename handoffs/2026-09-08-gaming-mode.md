@@ -275,3 +275,44 @@ fijo. Se descarta el cap de 105 W que se había propuesto.
   da 0. Solución: acumular y volcar en `END`, sin `exit`.
 - **`gaming on` repetido pisaba el perfil previo** con `performance`, así que
   `off` caía al fallback. Ahora solo guarda si el fichero de estado no existe.
+
+### Añadido 2026-09-08 — cierre de pendientes
+
+**Deriva bajo carga: no existe.** `tools/drift-test.sh` con 12 hilos al 100 %
+en performance: `pwm1_enable` se mantuvo en 1 a 85-87 °C sostenidos. Las RPM
+suben en rampa (3106 → 4053 → 4889 → 5600), sin acantilados, que era el
+objetivo del diseño. amd-pmf no interfiere.
+
+De paso el test capturó el ciclo completo en dos muestras consecutivas:
+`pwm1=2` al cambiar el perfil a quiet, `pwm1=1` dos segundos después cuando el
+hook la repuso. La premisa del módulo, demostrada en vivo.
+
+**Race de DRM por suspensión: no se manifiesta.** Ciclo suspend/resume sin
+`Device or resource busy` en el journal. Cierra el pendiente heredado.
+
+**La EC no resetea la curva al despertar.** Tras el resume, fan1 y fan2 seguían
+en modo 1 aunque el hook de `system-sleep` había fallado. El hook es red de
+seguridad, no requisito. (En cambio el reset por cambio de perfil sí es real y
+está demostrado arriba.)
+
+**ABM: no accionable.** Sin `amdgpu.abmlevel` en la cmdline, el nodo existe en
+`card2-eDP-2`, PPD sin acciones bloqueadas, y aun así 0 con batería en
+power-saver. Lo más probable es que la acción de panel de PPD (progresiva
+desde 0.22) solo escale con la batería más baja que el 50 % de la prueba.
+Observación, no pendiente.
+
+### Tres bugs corregidos
+
+- **`$HOME` sin proteger en `resolve_conf`.** `systemd-sleep` ejecuta los hooks
+  sin `HOME`; con `set -u` eso abortaba la función antes de llegar al candidato
+  de `/etc`, y el `2>/dev/null` del hook ocultaba el error real de bash. El
+  síntoma era un 'no encontré power.conf' sobre un archivo que sí existía.
+  Cualquier `$HOME` en código que pueda correr desde systemd va como `${HOME:-}`.
+- **`trap` reentrante en drift-test.** Un trap de INT que limpia pero no sale
+  deja el bucle vivo, y el `sleep` interrumpido devuelve al instante: cascada de
+  iteraciones. Guardia de reentrada + `exit` en el trap.
+- **RPM leídas del hwmon equivocado.** `fan1_input` no vive junto a
+  `pwm1_enable`; hay que buscarlo en `/sys/class/hwmon/hwmon*/`.
+
+Nota de método: un simulacro de trap con el script en background no vale, un
+proceso asíncrono hereda SIGINT ignorado y el trap queda inerte. Probar con TERM.
