@@ -1,0 +1,19 @@
+[Desktop Entry]
+Type=Application
+Name=Estado térmico y de energía
+Name[en]=Thermal and power status
+Comment=Perfil activo, curvas vivas de cada ventilador y estado de la dGPU
+Exec=/usr/local/bin/noctaliaq-hold /usr/local/bin/noctaliaq-power status
+Icon=utilities-system-monitor
+Terminal=true
+Categories=System;Monitor;
+Keywords=ventilador;fan;curva;temperatura;perfil;energia;rpm;pwm;estado;
+Actions=reapply;reset;
+
+[Desktop Action reapply]
+Name=Reaplicar curvas
+Exec=/usr/local/bin/noctaliaq-power apply
+
+[Desktop Action reset]
+Name=Ventiladores en automático
+Exec=/usr/local/bin/noctaliaq-power reset

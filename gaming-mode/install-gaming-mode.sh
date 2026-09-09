@@ -153,6 +153,7 @@ install_all() {
   head2 "Binarios"
   backup_and_copy "$SELF_DIR/bin/noctaliaq-power"    /usr/local/bin/noctaliaq-power    0755
   backup_and_copy "$SELF_DIR/bin/noctaliaq-gpu-mode" /usr/local/bin/noctaliaq-gpu-mode 0755
+  backup_and_copy "$SELF_DIR/bin/noctaliaq-hold"     /usr/local/bin/noctaliaq-hold     0755
   info "van a /usr/local/bin y no a ~/.local/bin a propósito: greetd lanza niri por"
   info "PAM y ~/.local/bin nunca entra en el PATH heredado."
 
@@ -197,8 +198,27 @@ install_all() {
   sudo systemctl daemon-reload || die "daemon-reload falló"
   info "la unidad se habilita sola cuando uses 'noctaliaq-gpu-mode integrated --persist'"
 
+  head2 "Entradas del launcher"
+  install_desktop
+
   head2 "Hook de Noctalia"
   install_hook
+}
+
+install_desktop() {
+  local dir="$HOME/.local/share/applications" f name
+  mkdir -p "$dir" || die "no pude crear $dir"
+  for f in "$SELF_DIR"/desktop/*.desktop; do
+    [[ -r "$f" ]] || die "no hay plantillas .desktop en $SELF_DIR/desktop/"
+    name="${f##*/}"
+    sed "s|@REPODIR@|$REPO_DIR|g" "$f" > "$dir/$name" || die "no pude escribir $dir/$name"
+    # sed devuelve 0 aunque no matchee: verificar que no quede placeholder
+    grep -q '@REPODIR@' "$dir/$name" && die "placeholder sin expandir en $name"
+    grep -q '^Exec=' "$dir/$name" || die "$name quedó sin línea Exec"
+    ok "$dir/$name"
+  done
+  command -v update-desktop-database >/dev/null 2>&1 && update-desktop-database "$dir" 2>/dev/null
+  info "el launcher de Noctalia las toma de ~/.local/share/applications"
 }
 
 install_hook() {
@@ -207,57 +227,81 @@ install_hook() {
   local f
   for f in "$repo" "$deployed"; do
     [[ -f "$f" ]] || { warn "no existe $f — se omite"; continue; }
-    cp -a "$f" "${f}.bak.${STAMP}" || die "no pude respaldar $f"
-    python3 - "$f" <<'PY' || die "no pude insertar el hook en $f"
-import re, sys
+    python3 - "$f" "$STAMP" <<'PY' || die "no pude insertar el hook en $f"
+import re, shutil, sys
 
-path = sys.argv[1]
-hooks = {
+path, stamp = sys.argv[1], sys.argv[2]
+CMDS = {
     "power_profile_changed": '"/usr/local/bin/noctaliaq-power apply \\"$NOCTALIA_POWER_PROFILE\\""',
-    "started":               '"/usr/local/bin/noctaliaq-power apply"',
+    "started": '"/usr/local/bin/noctaliaq-power apply"',
 }
+
 src = open(path, encoding="utf-8").read()
 lines = src.split("\n")
 
-# [hooks] puede venir indentado: el config de Noctalia indenta secciones.
 idx = next((i for i, l in enumerate(lines) if re.match(r"^\s*\[hooks\]\s*$", l)), None)
 if idx is None:
     lines += ["", "[hooks]"]
     idx = len(lines) - 1
 indent = re.match(r"^(\s*)", lines[idx]).group(1)
 
-# fin de la sección: la siguiente cabecera [..] al mismo o menor nivel
 end = len(lines)
 for i in range(idx + 1, len(lines)):
     if re.match(r"^\s*\[", lines[i]):
         end = i
         break
 
-changed = []
-for key, value in hooks.items():
-    pat = re.compile(r"^\s*" + key + r"\s*=")
-    hit = next((i for i in range(idx + 1, end) if pat.match(lines[i])), None)
-    new = indent + "  " + key + " = " + value
+def span(i):
+    """Fin de un valor que puede ser un array multilinea."""
+    depth = lines[i].count("[") - lines[i].count("]")
+    j = i
+    while depth > 0 and j + 1 < len(lines):
+        j += 1
+        depth += lines[j].count("[") - lines[j].count("]")
+    return j
+
+cambios = []
+for key, cmd in CMDS.items():
+    pat = re.compile(r"^(\s*)" + key + r"\s*=\s*(.*)$")
+    hit = next(((i, pat.match(lines[i]).group(1))
+                for i in range(idx + 1, end) if pat.match(lines[i])), None)
+
     if hit is None:
-        lines.insert(end, new)
+        lines.insert(end, indent + "  " + key + " = [ " + cmd + " ]")
         end += 1
-        changed.append(key + " (nuevo)")
-    elif lines[hit].strip() != new.strip():
-        print("  ! ya existe y difiere, NO se toca: " + lines[hit].strip())
+        cambios.append(key + ": creado")
+        continue
+
+    i, sangria = hit
+    last = span(i)
+    bloque = "\n".join(lines[i:last + 1])
+    if "noctaliaq-power" in bloque:
+        cambios.append(key + ": ya presente")
+        continue
+
+    # fusionar dentro del array existente en vez de reemplazar la clave
+    valor = bloque.split("=", 1)[1].strip()
+    if valor.startswith("["):
+        interior = valor[valor.index("[") + 1:valor.rindex("]")].strip().rstrip(",")
+        interior = (interior + ", " + cmd) if interior else cmd
     else:
-        changed.append(key + " (sin cambios)")
+        interior = valor + ", " + cmd
+    lines[i:last + 1] = [sangria + key + " = [ " + interior + " ]"]
+    end -= (last - i)
+    cambios.append(key + ": fusionado")
 
 if end < len(lines) and lines[end - 1].strip() and re.match(r"^\s*\[", lines[end]):
     lines.insert(end, "")
 
+shutil.copy2(path, path + ".bak." + stamp)
 open(path, "w", encoding="utf-8").write("\n".join(lines))
 
 # relectura: nunca confiar en el buffer de escritura
 check = open(path, encoding="utf-8").read()
-for key in hooks:
-    if key not in check:
-        sys.exit("  ERR " + key + " no quedó escrito en " + path)
-print("  ok  " + path + " -> " + ", ".join(changed or ["nada que hacer"]))
+n = check.count("/usr/local/bin/noctaliaq-power apply")
+if n < 2:
+    sys.exit("  ERR solo %d de 2 hooks quedaron en %s" % (n, path))
+print("  ok  " + path + " -> " + ", ".join(cambios))
 PY
   done
   command -v noctalia >/dev/null 2>&1 && { noctalia config validate || warn "noctalia config validate reporta problemas"; }
@@ -277,15 +321,24 @@ verify() {
   bash -n /usr/local/bin/noctaliaq-power    || die "noctaliaq-power tiene error de sintaxis"
   bash -n /usr/local/bin/noctaliaq-gpu-mode || die "noctaliaq-gpu-mode tiene error de sintaxis"
   ok "sintaxis de los scripts correcta"
-  grep -q 'power_profile_changed' "$HOME/.config/noctalia/config.toml" 2>/dev/null \
-    && ok "hook presente en el config desplegado" \
-    || warn "el hook no aparece en ~/.config/noctalia/config.toml"
+  # buscar el comando, no el nombre de la clave: un array vacío también matchea
+  local n
+  n="$(grep -c 'noctaliaq-power' "$HOME/.config/noctalia/config.toml" 2>/dev/null || echo 0)"
+  if [[ "$n" -ge 2 ]]; then
+    ok "los dos hooks presentes en el config desplegado"
+  else
+    die "solo $n de 2 hooks en ~/.config/noctalia/config.toml — la sincronía no quedaría activa"
+  fi
+  n="$(command ls "$HOME/.local/share/applications"/noctaliaq-*.desktop 2>/dev/null | wc -l)"
+  [[ "$n" -ge 4 ]] && ok "$n entradas en el launcher" || warn "solo $n entradas .desktop"
 }
 
 uninstall_all() {
   head2 "Desinstalando"
   sudo systemctl disable --now noctaliaq-gpu-mode.service 2>/dev/null
+  rm -f "$HOME/.local/share/applications"/noctaliaq-*.desktop
   sudo rm -f /usr/local/bin/noctaliaq-power /usr/local/bin/noctaliaq-gpu-mode \
+             /usr/local/bin/noctaliaq-hold \
              /etc/udev/rules.d/60-noctaliaq-hwaccess.rules \
              /etc/polkit-1/rules.d/49-noctaliaq-gpu-mode.rules \
              /usr/share/polkit-1/actions/org.noctaliaq.gpu-mode.policy \

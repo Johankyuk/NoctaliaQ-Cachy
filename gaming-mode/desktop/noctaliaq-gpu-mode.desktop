@@ -1,0 +1,20 @@
+[Desktop Entry]
+Type=Application
+Name=Modo de gráficos
+Name[en]=Graphics mode
+Comment=Cambia entre híbrido y solo iGPU (pide autenticación)
+Comment[en]=Switch between hybrid and iGPU-only (asks for authentication)
+Exec=/usr/local/bin/noctaliaq-hold /usr/local/bin/noctaliaq-gpu-mode status
+Icon=video-display
+Terminal=true
+Categories=System;Settings;HardwareSettings;
+Keywords=gpu;grafica;graficos;nvidia;hibrido;integrado;dgpu;igpu;optimus;bateria;
+Actions=hybrid;integrated;
+
+[Desktop Action hybrid]
+Name=Cambiar a híbrido
+Exec=/usr/local/bin/noctaliaq-hold /usr/local/bin/noctaliaq-gpu-mode hybrid --persist
+
+[Desktop Action integrated]
+Name=Cambiar a solo iGPU
+Exec=/usr/local/bin/noctaliaq-hold /usr/local/bin/noctaliaq-gpu-mode integrated --persist

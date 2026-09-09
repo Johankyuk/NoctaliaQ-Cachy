@@ -108,11 +108,35 @@ noctaliaq-gpu-mode status
 noctaliaq-gpu-mode integrated --persist
 ```
 
+## En el launcher
+
+`install-gaming-mode.sh` despliega cuatro entradas en
+`~/.local/share/applications/`, que es de donde el launcher de Noctalia lee:
+
+| Entrada | Qué hace | Acciones (clic derecho) |
+|---|---|---|
+| Modo Gaming | alterna el modo con un clic | Activar / Desactivar |
+| Estado térmico y de energía | perfil, curvas vivas y dGPU | Reaplicar curvas / Ventiladores en automático |
+| Modo de gráficos | estado de la GPU | Cambiar a híbrido / Cambiar a solo iGPU |
+| Asistente gaming-mode | reinstala o diagnostica | Solo diagnosticar |
+
+Las acciones de clic derecho requieren `show_app_actions` activo en el launcher
+(existe desde beta.9). Sin eso las entradas siguen funcionando, solo pierdes el
+submenú.
+
+Las que abren terminal pasan por `noctaliaq-hold`, que espera un Enter antes de
+cerrar: una entrada `.desktop` con `Terminal=true` cierra la ventana en cuanto
+el proceso termina y no alcanzas a leer nada. El spec de `.desktop` no permite
+`Terminal` dentro de un grupo `[Desktop Action]`, así que el wrapper es la única
+forma de que las acciones también dejen ver su salida.
+
+El `.desktop` del asistente es el único con una ruta al repo, y se genera en la
+instalación expandiendo `@REPODIR@`. Nada de eso se versiona con la ruta dentro.
+
 Keybinds sugeridos para `keybinds.kdl`:
 
 ```kdl
-Mod+Shift+G { spawn "noctaliaq-power" "gaming" "on"; }
-Mod+Shift+N { spawn "noctaliaq-power" "gaming" "off"; }
+Mod+Shift+G { spawn "noctaliaq-power" "gaming" "toggle"; }
 ```
 
 ## Limitaciones conocidas

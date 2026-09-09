@@ -18,6 +18,10 @@ STATE_DIR="${XDG_RUNTIME_DIR:-/tmp}/noctaliaq-power"
 GAMING_STATE="$STATE_DIR/gaming-prev-profile"
 
 log()  { logger -t "$TAG" -- "$*" 2>/dev/null; printf '%s\n' "$*"; }
+notify() {  # feedback visual cuando se lanza desde el launcher, sin terminal
+  command -v notify-send >/dev/null 2>&1 || return 0
+  notify-send -a "Modo Gaming" -i "${2:-applications-games}" "Modo Gaming" "$1" 2>/dev/null
+}
 warn() { logger -t "$TAG" -p user.warning -- "$*" 2>/dev/null; printf 'aviso: %s\n' "$*" >&2; }
 die()  { logger -t "$TAG" -p user.err -- "$*" 2>/dev/null; printf 'error: %s\n' "$*" >&2; exit 1; }
 
@@ -227,6 +231,7 @@ cmd_gaming() {
       fi
       [[ -n "${GAMING_ON_EXTRA:-}" ]] && sh -c "$GAMING_ON_EXTRA" >/dev/null 2>&1
       log "modo gaming ON"
+      notify "Activado — perfil ${GAMING_PROFILE:-performance}, curvas y dGPU despierta"
       ;;
     off)
       local prev=balanced
@@ -237,8 +242,13 @@ cmd_gaming() {
       [[ -n "${GAMING_OFF_EXTRA:-}" ]] && sh -c "$GAMING_OFF_EXTRA" >/dev/null 2>&1
       rm -f "$GAMING_STATE"
       log "modo gaming OFF (perfil restaurado: $prev)"
+      notify "Desactivado — perfil restaurado: $prev" "preferences-system"
       ;;
-    *) die "uso: noctaliaq-power gaming on|off" ;;
+    toggle)
+      # el fichero de estado es la fuente de verdad; lo crea 'on' y lo borra 'off'
+      if [[ -r "$GAMING_STATE" ]]; then cmd_gaming off; else cmd_gaming on; fi
+      ;;
+    *) die "uso: noctaliaq-power gaming on|off|toggle" ;;
   esac
 }
 
@@ -282,5 +292,5 @@ case "${1:-status}" in
   gaming) shift; cmd_gaming "${1:-}" ;;
   reset)  reset_curves ;;
   status) cmd_status ;;
-  *) printf 'uso: %s {apply [perfil]|gaming on|off|status|reset}\n' "${0##*/}" >&2; exit 1 ;;
+  *) printf 'uso: %s {apply [perfil]|gaming on|off|toggle|status|reset}\n' "${0##*/}" >&2; exit 1 ;;
 esac

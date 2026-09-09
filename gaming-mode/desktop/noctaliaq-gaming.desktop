@@ -1,0 +1,20 @@
+[Desktop Entry]
+Type=Application
+Name=Modo Gaming
+Name[en]=Gaming Mode
+Comment=Alterna perfil de rendimiento, curvas de ventilador y dGPU despierta
+Comment[en]=Toggle performance profile, fan curves and awake dGPU
+Exec=/usr/local/bin/noctaliaq-power gaming toggle
+Icon=applications-games
+Terminal=false
+Categories=System;Settings;
+Keywords=gaming;juego;juegos;rendimiento;performance;ventilador;fan;curva;gpu;tgp;turbo;
+Actions=on;off;
+
+[Desktop Action on]
+Name=Activar
+Exec=/usr/local/bin/noctaliaq-power gaming on
+
+[Desktop Action off]
+Name=Desactivar
+Exec=/usr/local/bin/noctaliaq-power gaming off

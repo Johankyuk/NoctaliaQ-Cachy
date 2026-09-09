@@ -179,3 +179,68 @@ toca.** No pelear con él fue la decisión de diseño principal.
 - [ ] Evaluar `NVreg_DynamicPowerManagement=0x02` para D3cold.
 - [ ] Heredado: ciclo suspend/resume como vía del race de DRM. El hook de
       `system-sleep` es otra pieza que ahora corre en ese camino.
+
+---
+
+## Añadido 2026-09-08 (cierre) — launcher y bloqueo de faillock
+
+### Entradas en el launcher de Noctalia
+
+Cuatro `.desktop` en `~/.local/share/applications/`: Modo Gaming (toggle,
+con acciones Activar/Desactivar), Estado térmico, Modo de gráficos y el
+Asistente. Se añadió el subcomando `noctaliaq-power gaming toggle` porque dos
+entradas separadas para encender y apagar es incómodo, y `notify-send` para
+tener confirmación sin terminal.
+
+Dos detalles del formato `.desktop`:
+
+- `Terminal=true` cierra la ventana en cuanto el proceso termina, así que no
+  se alcanza a leer nada. De ahí `noctaliaq-hold`, que espera un Enter.
+- El spec **no permite la clave `Terminal` dentro de `[Desktop Action]`**, así
+  que el wrapper es la única forma de que las acciones muestren su salida.
+
+El único `.desktop` con ruta al repo es el del asistente, y se genera en la
+instalación expandiendo `@REPODIR@` con verificación de que no quede sin
+expandir. Las acciones de clic derecho necesitan `show_app_actions` en el
+launcher (existe desde beta.9).
+
+### Pendientes cerrados
+
+- `install-gaming-mode.sh` ahora **fusiona dentro de los arrays** de `[hooks]`.
+  Probado contra cuatro casos: arrays existentes, sin sección `[hooks]`, hooks
+  como string suelto, y segunda corrida. TOML válido en todos.
+- `verify()` cuenta ocurrencias de `noctaliaq-power` en vez de buscar el nombre
+  de la clave, que un array vacío también matcheaba.
+
+### ⚠️ Gotcha grave: sudo en sustitución de procesos bloquea la cuenta
+
+Un `diff <(sudo cat ...) archivo` dejó tres procesos `sudo` (PIDs 141557,
+141284, 141467) peleándose el mismo tty en cuatro segundos. PAM no llega a
+comparar nada y falla con:
+
+```
+pam_unix(sudo:auth): conversation failed
+pam_unix(sudo:auth): auth could not identify password for [kyu]
+pam_faillock(sudo:auth): Consecutive login failures ... account temporarily locked
+```
+
+Tres de esos disparan `faillock` (`deny=3`). El síntoma parece contraseña
+equivocada y no lo es. Costó 17 minutos.
+
+**La columna `Valid` de `faillock` no sirve** para saber si el bloqueo sigue
+activo: refleja `fail_interval` (900 s), no `unlock_time` (600 s), y aquí se
+quedó en `V` mucho más allá de ambos. El dato confiable es el journal:
+
+```bash
+journalctl -b --no-pager | grep -iE 'faillock|pam_unix\(sudo|authentication failure' | tail -20
+```
+
+Regla: si un comando necesita `sudo`, que `sudo` sea la primera palabra de la
+línea. Nunca dentro de `<(...)`, de un pipe ni de una subshell.
+
+### Regresión de la sesión
+
+Sobrescribir `/etc/noctaliaq/power.conf` desde un paquete nuevo revirtió
+`NV_LGC_POWERSAVER=""` a `"0,900"`: el arreglo se había aplicado solo en la
+máquina, no en el origen. Todo cambio en caliente tiene que volver al repo el
+mismo día o el siguiente despliegue lo pisa.

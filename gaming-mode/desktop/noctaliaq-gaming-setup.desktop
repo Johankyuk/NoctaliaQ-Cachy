@@ -1,0 +1,16 @@
+[Desktop Entry]
+Type=Application
+Name=Asistente gaming-mode
+Name[en]=gaming-mode setup wizard
+Comment=Reinstala o diagnostica el módulo de curvas y GPU
+Exec=/usr/local/bin/noctaliaq-hold @REPODIR@/gaming-mode/install-gaming-mode.sh
+Path=@REPODIR@
+Icon=preferences-system
+Terminal=true
+Categories=System;Settings;
+Keywords=wizard;asistente;instalar;setup;diagnostico;probe;curvas;gaming;
+Actions=probe;
+
+[Desktop Action probe]
+Name=Solo diagnosticar
+Exec=/usr/local/bin/noctaliaq-hold @REPODIR@/gaming-mode/install-gaming-mode.sh --probe

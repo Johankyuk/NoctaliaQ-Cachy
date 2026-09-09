@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# noctaliaq-hold — corre un comando y deja la terminal abierta hasta que pulses
+# Enter. Existe porque las entradas .desktop con Terminal=true cierran la
+# ventana en cuanto el proceso termina, y no alcanzas a leer nada.
+"$@"
+printf '\n[%s] terminado. Enter para cerrar.' "${1##*/}"
+read -r _
