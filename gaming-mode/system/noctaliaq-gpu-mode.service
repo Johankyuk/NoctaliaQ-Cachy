@@ -1,0 +1,14 @@
+[Unit]
+Description=Aplicar el modo de GPU guardado (noctaliaq)
+DefaultDependencies=no
+After=sysinit.target
+Before=greetd.service display-manager.service
+ConditionPathExists=/etc/noctaliaq/gpu-mode
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/bin/noctaliaq-gpu-mode boot-apply
+
+[Install]
+WantedBy=multi-user.target

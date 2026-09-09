@@ -1,0 +1,286 @@
+#!/usr/bin/env bash
+# noctaliaq-power — sincroniza curvas de ventilador y política de dGPU con el
+#                   perfil de energía activo (Noctalia / power-profiles-daemon).
+#
+#   noctaliaq-power apply [perfil]   power-saver | balanced | performance
+#                                    sin argumento: lee el perfil activo de PPD
+#   noctaliaq-power gaming on|off
+#   noctaliaq-power status
+#   noctaliaq-power reset            devuelve los ventiladores al modo automático
+#
+# No toca CPU ni platform_profile: de eso ya se encarga power-profiles-daemon.
+# Este script cubre exactamente lo que PPD no cubre: curvas y dGPU.
+
+set -uo pipefail
+
+TAG=noctaliaq-power
+STATE_DIR="${XDG_RUNTIME_DIR:-/tmp}/noctaliaq-power"
+GAMING_STATE="$STATE_DIR/gaming-prev-profile"
+
+log()  { logger -t "$TAG" -- "$*" 2>/dev/null; printf '%s\n' "$*"; }
+warn() { logger -t "$TAG" -p user.warning -- "$*" 2>/dev/null; printf 'aviso: %s\n' "$*" >&2; }
+die()  { logger -t "$TAG" -p user.err -- "$*" 2>/dev/null; printf 'error: %s\n' "$*" >&2; exit 1; }
+
+# --- config ----------------------------------------------------------------
+resolve_conf() {
+  local c
+  for c in "${NOCTALIAQ_POWER_CONF:-}" "$HOME/.config/noctaliaq/power.conf" \
+           /etc/noctaliaq/power.conf; do
+    [[ -n "$c" && -r "$c" ]] && { printf '%s' "$c"; return 0; }
+  done
+  return 1
+}
+CONF="$(resolve_conf)" || die "no encontré power.conf (ni \$NOCTALIAQ_POWER_CONF, ni ~/.config/noctaliaq/, ni /etc/noctaliaq/)"
+# shellcheck disable=SC1090
+source "$CONF" || die "power.conf no se pudo leer: $CONF"
+
+# --- descubrimiento de hardware -------------------------------------------
+fan_hwmon() {
+  local d
+  for d in /sys/devices/platform/asus-nb-wmi/hwmon/hwmon*; do
+    [[ -r "$d/name" ]] || continue
+    [[ "$(<"$d/name")" == "asus_custom_fan_curve" ]] && { printf '%s' "$d"; return 0; }
+  done
+  return 1
+}
+
+nvidia_pci() {
+  local d
+  for d in /sys/bus/pci/devices/*; do
+    [[ -r "$d/vendor" && -r "$d/class" ]] || continue
+    [[ "$(<"$d/vendor")" == "0x10de" ]] || continue
+    [[ "$(<"$d/class")" == 0x0300* ]] || continue
+    printf '%s' "$d"; return 0
+  done
+  return 1
+}
+
+amdgpu_dpm() {
+  local d
+  for d in /sys/class/drm/card*/device; do
+    [[ -r "$d/vendor" ]] || continue
+    [[ "$(<"$d/vendor")" == "0x1002" ]] || continue
+    [[ -w "$d/power_dpm_force_performance_level" ]] || continue
+    printf '%s' "$d/power_dpm_force_performance_level"; return 0
+  done
+  return 1
+}
+
+active_profile() {
+  command -v powerprofilesctl >/dev/null 2>&1 && powerprofilesctl get 2>/dev/null && return 0
+  [[ -r /sys/firmware/acpi/platform_profile ]] && { cat /sys/firmware/acpi/platform_profile; return 0; }
+  return 1
+}
+
+norm() {  # power-saver -> POWERSAVER
+  case "${1,,}" in
+    power-saver|powersaver|power_saver|quiet|low-power) printf 'POWERSAVER' ;;
+    balanced|balanced-performance)                      printf 'BALANCED' ;;
+    performance)                                        printf 'PERFORMANCE' ;;
+    *) return 1 ;;
+  esac
+}
+
+# --- curvas ----------------------------------------------------------------
+# Escribe los 8 puntos y luego habilita. Reintenta: justo después de un cambio
+# de platform_profile la EC devuelve EIO durante unos cientos de ms.
+write_curve() {
+  local hw=$1 fan=$2 temps=$3 pwms=$4
+  [[ -w "$hw/pwm${fan}_enable" ]] || return 2   # ese ventilador no existe / sin permiso
+
+  local -a T P
+  read -ra T <<<"$temps"
+  read -ra P <<<"$pwms"
+  [[ ${#T[@]} -eq 8 && ${#P[@]} -eq 8 ]] || die "curva inválida para fan$fan: se esperan 8 puntos"
+
+  local prev=-1 i
+  for i in "${!T[@]}"; do
+    (( T[i] > prev )) || die "curva fan$fan: temperaturas no ascendentes en el punto $((i+1))"
+    (( P[i] >= 0 && P[i] <= 255 )) || die "curva fan$fan: PWM fuera de 0-255 en el punto $((i+1))"
+    prev=${T[i]}
+  done
+
+  local try
+  for try in 1 2 3; do
+    local ok=1
+    for i in 1 2 3 4 5 6 7 8; do
+      printf '%s' "${T[i-1]}" > "$hw/pwm${fan}_auto_point${i}_temp" 2>/dev/null || ok=0
+      printf '%s' "${P[i-1]}" > "$hw/pwm${fan}_auto_point${i}_pwm"  2>/dev/null || ok=0
+    done
+    printf '1' > "$hw/pwm${fan}_enable" 2>/dev/null || ok=0
+    if (( ok )) && [[ "$(<"$hw/pwm${fan}_enable")" == 1 ]]; then
+      # relectura: nunca confiar en el buffer de escritura
+      [[ "$(<"$hw/pwm${fan}_auto_point8_pwm")" == "${P[7]}" ]] && return 0
+    fi
+    sleep 0.4
+  done
+  return 1
+}
+
+apply_curves() {
+  local key=$1 hw
+  hw="$(fan_hwmon)" || { warn "sin hwmon asus_custom_fan_curve — se omiten las curvas"; return 0; }
+
+  local ct="CURVE_${key}_CPU_TEMP" cp="CURVE_${key}_CPU_PWM"
+  local gt="CURVE_${key}_GPU_TEMP" gp="CURVE_${key}_GPU_PWM"
+  [[ -n "${!ct:-}" ]] || die "power.conf no define $ct"
+
+  write_curve "$hw" 1 "${!ct}" "${!cp}"
+  case $? in
+    0) log "curva CPU aplicada ($key)" ;;
+    2) warn "fan1 (CPU) no escribible — ¿falta la regla udev?" ;;
+    *) die  "no pude aplicar la curva de CPU tras 3 intentos" ;;
+  esac
+
+  if [[ -n "${!gt:-}" ]]; then
+    write_curve "$hw" 2 "${!gt}" "${!gp}"
+    case $? in
+      0) log "curva GPU aplicada ($key)" ;;
+      2) warn "fan2 (GPU) no existe en este modelo — se omite" ;;
+      *) warn "no pude aplicar la curva de GPU tras 3 intentos" ;;
+    esac
+  fi
+}
+
+reset_curves() {
+  local hw fan
+  hw="$(fan_hwmon)" || die "sin hwmon asus_custom_fan_curve"
+  for fan in 1 2; do
+    [[ -w "$hw/pwm${fan}_enable" ]] || continue
+    printf '3' > "$hw/pwm${fan}_enable" 2>/dev/null \
+      && log "fan$fan devuelto a automático de fábrica"
+  done
+}
+
+# --- NVIDIA ----------------------------------------------------------------
+apply_nvidia() {
+  local key=$1 dev status
+  dev="$(nvidia_pci)" || return 0
+
+  local rt_var="NV_RUNTIME_${key}"
+  if [[ -w "$dev/power/control" && -n "${!rt_var:-}" ]]; then
+    printf '%s' "${!rt_var}" > "$dev/power/control" 2>/dev/null \
+      && log "dGPU runtime PM -> ${!rt_var}"
+  fi
+
+  status="$(cat "$dev/power/runtime_status" 2>/dev/null || echo unknown)"
+  if [[ "$status" == suspended ]]; then
+    log "dGPU dormida (D3cold) — no se llama a nvidia-smi para no despertarla"
+    return 0
+  fi
+  command -v nvidia-smi >/dev/null 2>&1 || return 0
+
+  local lgc_var="NV_LGC_${key}" pl_var="NV_PL_${key}"
+  if [[ -n "${!lgc_var:-}" ]]; then
+    nvidia-smi -lgc "${!lgc_var}" >/dev/null 2>&1 \
+      && log "reloj gráfico bloqueado en ${!lgc_var} MHz" \
+      || warn "esta GPU no acepta -lgc (normal en varias móviles)"
+  else
+    nvidia-smi -rgc >/dev/null 2>&1 && log "reloj gráfico liberado"
+  fi
+
+  if [[ -n "${!pl_var:-}" ]]; then
+    nvidia-smi -pl "${!pl_var}" >/dev/null 2>&1 \
+      && log "límite de potencia -> ${!pl_var} W" \
+      || warn "esta GPU no acepta -pl"
+  fi
+}
+
+apply_amdgpu() {
+  local f
+  # vacio = no tocar; PPD deja este nodo en auto y no queremos ruido
+  [[ -n "${AMDGPU_DPM_LEVEL:-}" ]] || return 0
+  f="$(amdgpu_dpm)" || return 0
+  printf '%s' "$AMDGPU_DPM_LEVEL" > "$f" 2>/dev/null \
+    && log "iGPU dpm -> $AMDGPU_DPM_LEVEL"
+}
+
+# --- comandos --------------------------------------------------------------
+cmd_apply() {
+  local profile="${1:-}"
+  [[ -n "$profile" ]] || profile="$(active_profile)" || die "no pude leer el perfil activo"
+  local key
+  key="$(norm "$profile")" || die "perfil desconocido: '$profile'"
+
+  # La EC necesita un respiro tras el cambio de platform_profile que hace PPD.
+  sleep 0.3
+  apply_curves "$key"
+  apply_nvidia "$key"
+  apply_amdgpu
+  log "perfil '$profile' aplicado"
+}
+
+cmd_gaming() {
+  mkdir -p "$STATE_DIR"
+  case "${1:-}" in
+    on)
+      if command -v powerprofilesctl >/dev/null 2>&1; then
+        powerprofilesctl get > "$GAMING_STATE" 2>/dev/null
+        powerprofilesctl set "${GAMING_PROFILE:-performance}" 2>/dev/null \
+          || warn "no pude fijar el perfil ${GAMING_PROFILE:-performance}"
+      fi
+      cmd_apply "${GAMING_PROFILE:-performance}"
+      local dev
+      if dev="$(nvidia_pci)" && [[ -w "$dev/power/control" ]]; then
+        printf '%s' "${NV_RUNTIME_GAMING:-on}" > "$dev/power/control" 2>/dev/null \
+          && log "dGPU fijada despierta (runtime PM = ${NV_RUNTIME_GAMING:-on})"
+      fi
+      [[ -n "${GAMING_ON_EXTRA:-}" ]] && sh -c "$GAMING_ON_EXTRA" >/dev/null 2>&1
+      log "modo gaming ON"
+      ;;
+    off)
+      local prev=balanced
+      [[ -r "$GAMING_STATE" ]] && prev="$(<"$GAMING_STATE")"
+      [[ "$prev" == "${GAMING_PROFILE:-performance}" ]] && prev=balanced
+      command -v powerprofilesctl >/dev/null 2>&1 && powerprofilesctl set "$prev" 2>/dev/null
+      cmd_apply "$prev"
+      [[ -n "${GAMING_OFF_EXTRA:-}" ]] && sh -c "$GAMING_OFF_EXTRA" >/dev/null 2>&1
+      rm -f "$GAMING_STATE"
+      log "modo gaming OFF (perfil restaurado: $prev)"
+      ;;
+    *) die "uso: noctaliaq-power gaming on|off" ;;
+  esac
+}
+
+cmd_status() {
+  local hw dev
+  printf 'config      : %s\n' "$CONF"
+  printf 'perfil      : %s\n' "$(active_profile || echo '?')"
+  if [[ -r /sys/firmware/acpi/platform_profile ]]; then
+    printf 'platform    : %s\n' "$(</sys/firmware/acpi/platform_profile)"
+  fi
+  if hw="$(fan_hwmon)"; then
+    printf 'hwmon       : %s\n' "$hw"
+    local fan
+    for fan in 1 2; do
+      [[ -r "$hw/pwm${fan}_enable" ]] || continue
+      local mode; mode="$(<"$hw/pwm${fan}_enable")"
+      local label="auto"; [[ "$mode" == 1 ]] && label="curva propia"
+      printf 'fan%s        : modo %s (%s)' "$fan" "$mode" "$label"
+      local i out=""
+      for i in 1 2 3 4 5 6 7 8; do
+        out+="$(<"$hw/pwm${fan}_auto_point${i}_temp")°/$(<"$hw/pwm${fan}_auto_point${i}_pwm") "
+      done
+      printf '  %s\n' "$out"
+      [[ -r "$hw/fan${fan}_input" ]] && printf '            rpm %s\n' "$(<"$hw/fan${fan}_input")"
+    done
+  else
+    printf 'hwmon       : no disponible\n'
+  fi
+  if dev="$(nvidia_pci)"; then
+    printf 'dGPU        : %s  runtime=%s/%s\n' "${dev##*/}" \
+      "$(cat "$dev/power/control" 2>/dev/null || echo '?')" \
+      "$(cat "$dev/power/runtime_status" 2>/dev/null || echo '?')"
+  else
+    printf 'dGPU        : ausente (modo integrado)\n'
+  fi
+  [[ -r "$GAMING_STATE" ]] && printf 'gaming      : ON (previo: %s)\n' "$(<"$GAMING_STATE")"
+}
+
+case "${1:-status}" in
+  apply)  shift; cmd_apply "${1:-}" ;;
+  gaming) shift; cmd_gaming "${1:-}" ;;
+  reset)  reset_curves ;;
+  status) cmd_status ;;
+  *) printf 'uso: %s {apply [perfil]|gaming on|off|status|reset}\n' "${0##*/}" >&2; exit 1 ;;
+esac

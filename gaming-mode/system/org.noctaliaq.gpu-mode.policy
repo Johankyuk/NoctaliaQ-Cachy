@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC
+ "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
+<policyconfig>
+  <vendor>NoctaliaQ</vendor>
+  <action id="org.noctaliaq.gpu-mode">
+    <description>Cambiar el modo de graficos (hibrido / integrado)</description>
+    <description xml:lang="en">Switch graphics mode (hybrid / integrated)</description>
+    <message>Se requiere autenticacion para cambiar el modo de graficos</message>
+    <message xml:lang="en">Authentication is required to switch the graphics mode</message>
+    <defaults>
+      <allow_any>no</allow_any>
+      <allow_inactive>no</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/local/bin/noctaliaq-gpu-mode</annotate>
+    <annotate key="org.freedesktop.policykit.exec.allow_gui">true</annotate>
+  </action>
+</policyconfig>

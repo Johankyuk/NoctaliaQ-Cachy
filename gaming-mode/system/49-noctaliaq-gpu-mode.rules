@@ -1,0 +1,10 @@
+// noctaliaq — cambio de modo de GPU sin contrasena para wheel en sesion local.
+// OPCIONAL: install-gaming-mode.sh pregunta antes de instalarla.
+// Mismo criterio que 49-noctalia-greeter-sync.rules: la policy fija exec.path,
+// asi que la regla no puede ser secuestrada por otro binario.
+polkit.addRule(function(action, subject) {
+    if (action.id == "org.noctaliaq.gpu-mode" &&
+        subject.isInGroup("wheel") && subject.local && subject.active) {
+        return polkit.Result.YES;
+    }
+});

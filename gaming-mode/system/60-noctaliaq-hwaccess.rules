@@ -1,0 +1,15 @@
+# noctaliaq — acceso de escritura para el grupo wheel a los nodos que
+# noctaliaq-power necesita tocar en cada cambio de perfil.
+# Sin esto haría falta root (y por tanto un prompt) varias veces al día.
+
+# Curvas de ventilador ASUS (asus-nb-wmi -> hwmon "asus_custom_fan_curve")
+SUBSYSTEM=="hwmon", ACTION=="add", ATTR{name}=="asus_custom_fan_curve", \
+  RUN+="/bin/sh -c 'chgrp wheel /sys%p/pwm[12]_enable /sys%p/pwm[12]_auto_point[1-8]_temp /sys%p/pwm[12]_auto_point[1-8]_pwm 2>/dev/null; chmod g+w /sys%p/pwm[12]_enable /sys%p/pwm[12]_auto_point[1-8]_temp /sys%p/pwm[12]_auto_point[1-8]_pwm 2>/dev/null'"
+
+# runtime PM de la dGPU NVIDIA
+SUBSYSTEM=="pci", ACTION=="add", ATTR{vendor}=="0x10de", ATTR{class}=="0x030000", \
+  RUN+="/bin/sh -c 'chgrp wheel /sys%p/power/control 2>/dev/null; chmod g+w /sys%p/power/control 2>/dev/null'"
+
+# nivel DPM de la iGPU AMD
+SUBSYSTEM=="pci", ACTION=="add", ATTR{vendor}=="0x1002", ATTR{class}=="0x030000", \
+  RUN+="/bin/sh -c 'chgrp wheel /sys%p/power_dpm_force_performance_level 2>/dev/null; chmod g+w /sys%p/power_dpm_force_performance_level 2>/dev/null'"

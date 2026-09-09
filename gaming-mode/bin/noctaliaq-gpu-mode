@@ -1,0 +1,229 @@
+#!/usr/bin/env bash
+# noctaliaq-gpu-mode — cambia entre gráficos híbridos y solo-iGPU sin
+#                      supergfxctl, optimus-manager ni nada de terceros.
+#
+#   noctaliaq-gpu-mode status
+#   noctaliaq-gpu-mode hybrid      [--persist]
+#   noctaliaq-gpu-mode integrated  [--persist] [--at-boot]
+#
+#   --persist   sobrevive al reboot (blacklist en modprobe.d + unidad systemd)
+#   --at-boot   no intenta el cambio en caliente; solo lo deja armado
+#
+# El MUX (modo "ultimate"/dGPU-directa) queda deliberadamente fuera: exige
+# reboot por ACPI y deja el equipo sin salida de video si algo sale mal.
+
+set -uo pipefail
+
+TAG=noctaliaq-gpu-mode
+WMI=/sys/devices/platform/asus-nb-wmi
+STATE=/etc/noctaliaq/gpu-mode
+MODPROBE=/etc/modprobe.d/noctaliaq-gpu-mode.conf
+UNIT=noctaliaq-gpu-mode.service
+NV_MODULES=(nvidia_drm nvidia_modeset nvidia_uvm nvidia)
+
+log()  { logger -t "$TAG" -- "$*" 2>/dev/null; printf '%s\n' "$*"; }
+warn() { logger -t "$TAG" -p user.warning -- "$*" 2>/dev/null; printf 'aviso: %s\n' "$*" >&2; }
+die()  { logger -t "$TAG" -p user.err -- "$*" 2>/dev/null; printf 'error: %s\n' "$*" >&2; exit 1; }
+
+need_root() {
+  [[ $EUID -eq 0 ]] && return 0
+  command -v pkexec >/dev/null 2>&1 || die "requiere root (y no hay pkexec)"
+  exec pkexec "$(realpath "$0")" "$@"
+}
+
+nvidia_pci() {
+  local d
+  for d in /sys/bus/pci/devices/*; do
+    [[ -r "$d/vendor" && -r "$d/class" ]] || continue
+    [[ "$(<"$d/vendor")" == "0x10de" && "$(<"$d/class")" == 0x0300* ]] || continue
+    printf '%s' "$d"; return 0
+  done
+  return 1
+}
+
+loaded_modules() {
+  local m out=()
+  for m in "${NV_MODULES[@]}"; do
+    grep -q "^${m} " /proc/modules && out+=("$m")
+  done
+  printf '%s\n' "${out[@]:-}"
+}
+
+holders() {
+  # quién impide descargar los módulos
+  local m refs users
+  for m in "${NV_MODULES[@]}"; do
+    read -r _ _ refs users _ < <(grep "^${m} " /proc/modules) || continue
+    [[ "${refs:-0}" != 0 ]] && printf '  %-16s usado por: %s\n' "$m" "$users"
+  done
+  if command -v fuser >/dev/null 2>&1; then
+    local procs
+    procs="$(fuser -v /dev/nvidia* 2>&1 | tail -n +2)"
+    [[ -n "$procs" ]] && printf '  procesos con /dev/nvidia* abierto:\n%s\n' "$procs"
+  fi
+}
+
+stop_nv_services() {
+  local s
+  STOPPED=()
+  for s in nvidia-powerd nvidia-persistenced; do
+    if systemctl is-active --quiet "$s" 2>/dev/null; then
+      systemctl stop "$s" && STOPPED+=("$s") && log "detenido $s"
+    fi
+  done
+}
+
+start_nv_services() {
+  local s
+  for s in nvidia-powerd nvidia-persistenced; do
+    systemctl list-unit-files "$s.service" >/dev/null 2>&1 || continue
+    systemctl start "$s" 2>/dev/null && log "arrancado $s"
+  done
+}
+
+write_blacklist() {
+  mkdir -p "${MODPROBE%/*}"
+  cat > "$MODPROBE" <<'EOF'
+# Generado por noctaliaq-gpu-mode. Borrar este archivo devuelve el modo híbrido.
+# nouveau va aquí también: si solo se bloquea nvidia, el kernel carga nouveau y
+# vuelve a encender la dGPU (bug conocido de supergfxctl, issue #175).
+blacklist nvidia
+blacklist nvidia_drm
+blacklist nvidia_modeset
+blacklist nvidia_uvm
+blacklist nouveau
+EOF
+  [[ -s "$MODPROBE" ]] || die "no pude escribir $MODPROBE"
+  grep -qc '^blacklist nouveau$' "$MODPROBE" || die "verificación de $MODPROBE falló"
+  log "blacklist escrita en $MODPROBE"
+
+  if grep -qE '^MODULES=.*nvidia' /etc/mkinitcpio.conf 2>/dev/null; then
+    warn "mkinitcpio.conf tiene nvidia en MODULES= : se cargan a la fuerza desde el"
+    warn "initramfs y la blacklist no los detiene. Quítalos de ahí y corre 'mkinitcpio -P'."
+  fi
+}
+
+set_state() {
+  mkdir -p "${STATE%/*}"
+  printf '%s\n' "$1" > "$STATE"
+  [[ "$(<"$STATE")" == "$1" ]] || die "no pude persistir el estado en $STATE"
+}
+
+dgpu_off() {
+  if [[ -w "$WMI/dgpu_disable" ]]; then
+    printf '1' > "$WMI/dgpu_disable" || return 1
+    sleep 0.5
+    [[ "$(<"$WMI/dgpu_disable")" == 1 ]] || return 1
+    log "dgpu_disable = 1 (apagada por firmware ASUS)"
+    return 0
+  fi
+  local dev
+  dev="$(nvidia_pci)" || { log "la dGPU ya no está en el bus"; return 0; }
+  printf '1' > "$dev/remove" || return 1
+  sleep 0.5
+  log "dGPU removida del bus PCI (${dev##*/})"
+}
+
+dgpu_on() {
+  if [[ -w "$WMI/dgpu_disable" ]]; then
+    printf '0' > "$WMI/dgpu_disable" || warn "no pude escribir dgpu_disable"
+    sleep 0.5
+  fi
+  printf '1' > /sys/bus/pci/rescan 2>/dev/null
+  sleep 1
+  nvidia_pci >/dev/null || { sleep 2; printf '1' > /sys/bus/pci/rescan 2>/dev/null; sleep 1; }
+  nvidia_pci >/dev/null || return 1
+  log "dGPU presente en el bus"
+}
+
+cmd_status() {
+  printf 'estado guardado : %s\n' "$( [[ -r $STATE ]] && cat "$STATE" || echo '(sin fijar)' )"
+  printf 'blacklist       : %s\n' "$( [[ -f $MODPROBE ]] && echo "presente ($MODPROBE)" || echo ausente )"
+  if [[ -r "$WMI/dgpu_disable" ]]; then
+    printf 'dgpu_disable    : %s\n' "$(<"$WMI/dgpu_disable")"
+  else
+    printf 'dgpu_disable    : no expuesto por asus-nb-wmi (se usará remove/rescan PCI)\n'
+  fi
+  if [[ -r "$WMI/gpu_mux_mode" ]]; then
+    printf 'gpu_mux_mode    : %s (1 = Optimus/híbrido, 0 = MUX a dGPU)\n' "$(<"$WMI/gpu_mux_mode")"
+  fi
+  local dev
+  if dev="$(nvidia_pci)"; then
+    printf 'dGPU en bus     : sí (%s) runtime=%s/%s  potencia=%s\n' "${dev##*/}" \
+      "$(cat "$dev/power/control" 2>/dev/null || echo '?')" \
+      "$(cat "$dev/power/runtime_status" 2>/dev/null || echo '?')" \
+      "$(cat "$dev/power_state" 2>/dev/null || echo '?')"
+  else
+    printf 'dGPU en bus     : no\n'
+  fi
+  local mods; mapfile -t mods < <(loaded_modules)
+  printf 'módulos         : %s\n' "$( [[ -n ${mods[*]:-} ]] && echo "${mods[*]}" || echo ninguno )"
+  command -v nvidia-smi >/dev/null 2>&1 && nvidia-smi -L 2>/dev/null | sed 's/^/                  /'
+  return 0
+}
+
+cmd_integrated() {
+  local persist=0 atboot=0 a
+  for a in "$@"; do
+    [[ "$a" == --persist ]] && persist=1
+    [[ "$a" == --at-boot ]] && { atboot=1; persist=1; }
+  done
+
+  if (( ! atboot )); then
+    stop_nv_services
+    if [[ -n "$(loaded_modules)" ]]; then
+      modprobe -r "${NV_MODULES[@]}" 2>/dev/null
+      sleep 0.5
+    fi
+    if [[ -n "$(loaded_modules)" ]]; then
+      printf 'no pude descargar los módulos NVIDIA. Quién los retiene:\n' >&2
+      holders >&2
+      printf '\nLa sesión gráfica suele ser la culpable. Opciones:\n' >&2
+      printf '  - cerrar sesión y correr esto desde un TTY (Ctrl+Alt+F2), o\n' >&2
+      printf '  - %s integrated --at-boot   (lo deja armado para el próximo arranque)\n' "${0##*/}" >&2
+      start_nv_services
+      exit 1
+    fi
+    dgpu_off || die "no pude apagar la dGPU"
+  fi
+
+  if (( persist )); then
+    write_blacklist
+    set_state integrated
+    systemctl enable "$UNIT" >/dev/null 2>&1 && log "$UNIT habilitada"
+  fi
+  (( atboot )) && log "modo integrado armado para el próximo arranque" \
+                || log "modo integrado activo$( (( persist )) && echo ' y persistente' )"
+}
+
+cmd_hybrid() {
+  local persist=0 a
+  for a in "$@"; do [[ "$a" == --persist ]] && persist=1; done
+
+  [[ -f "$MODPROBE" ]] && { rm -f "$MODPROBE"; log "blacklist eliminada"; }
+  dgpu_on || die "la dGPU no reapareció en el bus PCI — hace falta reiniciar"
+
+  modprobe nvidia 2>/dev/null && modprobe nvidia_modeset 2>/dev/null
+  modprobe nvidia_uvm 2>/dev/null; modprobe nvidia_drm 2>/dev/null
+  sleep 0.5
+  [[ -n "$(loaded_modules)" ]] || warn "los módulos no cargaron; puede requerir reinicio"
+  start_nv_services
+
+  if command -v nvidia-smi >/dev/null 2>&1; then
+    nvidia-smi -L >/dev/null 2>&1 && log "nvidia-smi responde: $(nvidia-smi -L | head -1)" \
+                                  || warn "nvidia-smi no responde todavía"
+  fi
+  (( persist )) && { set_state hybrid; systemctl disable "$UNIT" >/dev/null 2>&1; }
+  log "modo híbrido activo"
+}
+
+case "${1:-status}" in
+  status) cmd_status ;;
+  integrated) need_root "$@"; shift; cmd_integrated "$@" ;;
+  hybrid)     need_root "$@"; shift; cmd_hybrid "$@" ;;
+  boot-apply) # usado por la unidad systemd, no por humanos
+    need_root "$@"
+    [[ -r "$STATE" && "$(<"$STATE")" == integrated ]] && dgpu_off
+    ;;
+  *) printf 'uso: %s {status|hybrid|integrated} [--persist] [--at-boot]\n' "${0##*/}" >&2; exit 1 ;;
+esac
