@@ -388,3 +388,123 @@ por `nvidia_wmi_ec_backlight`.
       `noctaliaq-gpu-mode integrated` **sin `--persist`**, `status`,
       `sudo systemctl start greetd`, entrar y probar el brillo. Cualquier
       reinicio revierte. Decidir después si compensa 2.08 W.
+
+### Cerrado 2026-09-09 — modo integrado validado
+
+**El camino era por firmware, no por descarga de modulos en vivo.** El repo
+viejo `Johankyuk/NoctaliaQ` (`scripts/noctaliaq-gpu.sh`) ya lo resolvia asi:
+escribir `dgpu_disable` en `/sys/class/firmware-attributes/asus-armoury/`
+y reiniciar. El firmware apaga la dGPU en el arranque, antes de que exista
+niri.
+
+**Precondicion no documentada en ningun lado: los modulos NVIDIA deben estar
+descargados al escribir el nodo.** Con la sesion grafica viva el write falla
+con `-EIO` y el journal solo dice `asus_armoury: Failed to set current_value:
+(result): 0x0`. Mismo comportamiento que supergfxd, que espera a que todas
+las sesiones terminen antes de cambiar de modo. Estar en AC no basta ni hace
+falta: el primer intento fue en bateria y fallo igual con cargador puesto.
+
+**Gotcha grave: el nodo miente tras un write fallido.** `current_value` y el
+nodo legacy `asus-nb-wmi/dgpu_disable` leen `1` aunque `tee` haya devuelto
+`-EIO` y `pending_reboot` siga en `0`. Verificar las TRES cosas: codigo de
+salida del write, relectura, y `pending_reboot`. Con dos de las tres se
+reinicia a ciegas con estado sucio.
+
+**Procedimiento validado** (desde TTY, greetd abajo):
+
+```bash
+sudo systemctl stop greetd
+sudo modprobe -r nvidia_drm nvidia_modeset nvidia_uvm nvidia
+echo 1 | sudo tee /sys/class/firmware-attributes/asus-armoury/attributes/dgpu_disable/current_value
+systemctl reboot
+```
+
+Reversion: mismo write con `0` desde cualquier sesion (no necesita TTY ni
+descargar modulos, porque no hay modulos cargados) + reinicio.
+
+**Medicion: 7.66 W en bateria contra 11.46 W en Hibrida.** 3.8 W, casi el
+doble de los 2.08 W que reportaba `nvidia-smi` — la dGPU costaba mas de lo
+que ella misma declaraba.
+
+**El brillo sobrevive.** `nvidia_wmi_ec_backlight` sigue funcionando con la
+dGPU fuera del bus: el nodo WMI cuelga de `PNP0C14:00` (plataforma ACPI), no
+del dispositivo PCI. `amdgpu` sigue emitiendo `Skipping amdgpu DM backlight
+registration` — el arbitraje no cambia al apagar la dGPU. `acpi_backlight=native`
+queda como pendiente opcional, ya no como bloqueo.
+
+`noctaliaq-gpu-mode status` degrada limpio sin dGPU (reporta `dGPU en bus: no`,
+`modulos: ninguno`, y el fallo de `nvidia-smi` como texto informativo).
+
+### Cerrado 2026-09-09 — modo integrado validado + brillo nativo
+
+**El camino era por firmware, no descargando modulos en vivo.** El repo
+viejo `Johankyuk/NoctaliaQ` (`scripts/noctaliaq-gpu.sh`) ya lo resolvia asi:
+escribir `dgpu_disable` en `/sys/class/firmware-attributes/asus-armoury/` y
+reiniciar. El firmware apaga la dGPU en el arranque, antes de que exista niri.
+Toda la ingenieria de descargar modulos con la sesion viva sobraba.
+
+**Precondicion no documentada: los modulos NVIDIA deben estar descargados al
+escribir el nodo.** Con la sesion grafica viva el write falla con `-EIO` y el
+journal solo dice `asus_armoury: Failed to set current_value: (result): 0x0`.
+Mismo comportamiento que supergfxd, que espera a que terminen todas las
+sesiones. El AC no influye: fallo igual en bateria y con cargador puesto.
+
+**Gotcha grave: el nodo miente tras un write fallido.** `current_value` y el
+legacy `asus-nb-wmi/dgpu_disable` leen `1` aunque `tee` devuelva `-EIO` y
+`pending_reboot` siga en `0`. Verificar las TRES cosas: codigo de salida,
+relectura y `pending_reboot`. Con dos de las tres se reinicia con estado sucio.
+
+**Procedimiento validado** (TTY, greetd abajo):
+
+```bash
+sudo systemctl stop greetd
+sudo modprobe -r nvidia_drm nvidia_modeset nvidia_uvm nvidia
+echo 1 | sudo tee /sys/class/firmware-attributes/asus-armoury/attributes/dgpu_disable/current_value
+systemctl reboot
+```
+
+Reversion: mismo write con `0` desde cualquier sesion (sin TTY ni modprobe,
+porque ya no hay modulos cargados) + reinicio.
+
+**Medicion: 7.66 W en bateria contra 11.46 W en Hibrida.** 3.8 W, casi el
+doble de los 2.08 W que reportaba `nvidia-smi`. La dGPU costaba mas de lo que
+ella misma declaraba.
+
+#### El brillo: el bloqueo real, y su fix
+
+El nodo WMI sobrevive al apagado (cuelga de `PNP0C14:00`, plataforma ACPI, no
+del dispositivo PCI) — pero **deja de mover el panel**: el numero cambia,
+`brightness` acepta el valor, y la pantalla no responde. Verificar brillo con
+los ojos, nunca con `cat`.
+
+**Fix: `acpi_backlight=native` en la cmdline.** amdgpu se abstenia de
+registrar su backlight (`Skipping amdgpu DM backlight registration`) porque el
+arbitraje del kernel elegia la ruta `nvidia_wmi_ec`. Con `native` registra
+`amdgpu_bl1` (`type=raw`, escala 0-65535) y mueve el panel de verdad.
+Teclas de brillo, `brightnessctl` y el slider de Noctalia responden.
+
+El brillo queda independiente de NVIDIA de forma permanente — mejora valida
+en Hibrida tambien, no solo en Integrada.
+
+**Punto de edicion de la cmdline: `LINUX_OPTIONS` en `/etc/sdboot-manage.conf`
++ `sudo sdboot-manage gen`.** `/etc/kernel/cmdline` es un archivo muerto en
+este sistema (ademas de tener el bloque `splash rw rootflags root=UUID`
+duplicado): `sdboot-manage` nunca lo lee — su linea 199 es
+`options ${sdoptions} ${LINUX_OPTIONS}`. Editar ahi no habria hecho nada.
+
+Verificar siempre con `sudo bash -c 'grep -h "^options" /boot/loader/entries/*.conf'`:
+el ESP no es legible por el usuario, y un glob sobre `/boot` sin sudo da
+`zsh: no matches found`, que parece "no existe" y es "no puedo leer".
+
+`noctaliaq-gpu-mode status` degrada limpio sin dGPU.
+
+#### Pendientes derivados
+
+- [ ] Portar al modulo el camino de firmware (`dgpu_disable` + reinicio) en
+      lugar del unbind en vivo, con la verificacion de tres puntos.
+- [ ] Portar la distincion modo real vs. modo pendiente de `noctaliaq-gpu.sh`.
+- [ ] Evaluar el tercer modo (Ultimate, `gpu_mux_mode=0`) + `refresh-lock/`
+      del repo viejo. Ojo: el valor `1` para volver de Ultimate nunca se
+      confirmo en una corrida real.
+- [ ] `acpi_backlight=native` a `install.sh` (aplica a cualquier maquina con
+      este arbitraje, no solo a la TUF).
