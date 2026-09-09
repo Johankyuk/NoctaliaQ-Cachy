@@ -244,3 +244,34 @@ Sobrescribir `/etc/noctaliaq/power.conf` desde un paquete nuevo revirtió
 `NV_LGC_POWERSAVER=""` a `"0,900"`: el arreglo se había aplicado solo en la
 máquina, no en el origen. Todo cambio en caliente tiene que volver al repo el
 mismo día o el siguiente despliegue lo pisa.
+
+### Añadido 2026-09-08 — unificación con gpu-prime (composición)
+
+El offload de PRIME lo decide **`noctaliaq-gpu-prime` y solo él**: verifica el
+cargador contra sysfs porque los hooks de Noctalia disparan mal en las
+transiciones, con `flock` y debounce. Escribe `gpu-prime-state`, que leen
+`noctaliaq-gpu-launch` (nativas, vía `launch_apps_custom_command`) y
+`noctaliaq-gpu-flatpak-sync` (flatpaks, vía `flatpak override` porque flatpak
+no hereda env vars del host).
+
+Se descartó darle un override al modo gaming: sería romper la premisa que hace
+fiable a ese script. En su lugar, `noctaliaq-power` **lee y nunca escribe**:
+
+- `status` reporta PRIME y marca ⚠ si no concuerda con el cargador.
+- `status` reporta el techo de TGP actual contra el máximo.
+- `gaming on` avisa con batería, porque ahí `gpu-launch` oculta el ICD de
+  NVIDIA al loader de Vulkan y las apps Vulkan-nativas correrían sobre la iGPU.
+
+**El TGP no se toca.** Default 55 W, máximo 140, y `nvidia-powerd` lo mueve en
+vivo: observado en 115 bajo performance y en 55 en power-saver idle. Fijarlo
+con `-pl` sería competir con Dynamic Boost, que lo hace mejor que un número
+fijo. Se descarta el cap de 105 W que se había propuesto.
+
+### Dos bugs corregidos en el camino
+
+- **SIGPIPE + `pipefail`.** `nvidia-smi | awk '...{print; exit}'`: awk cierra la
+  tubería, nvidia-smi muere con 141 y `pipefail` marca la función como fallida
+  aunque el dato ya estaba impreso. Reproducido: con `exit` da 141, sin `exit`
+  da 0. Solución: acumular y volcar en `END`, sin `exit`.
+- **`gaming on` repetido pisaba el perfil previo** con `performance`, así que
+  `off` caía al fallback. Ahora solo guarda si el fichero de estado no existe.

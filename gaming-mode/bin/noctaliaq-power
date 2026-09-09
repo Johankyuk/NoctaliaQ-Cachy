@@ -70,6 +70,33 @@ amdgpu_dpm() {
   return 1
 }
 
+# --- PRIME: solo lectura. La autoridad es noctaliaq-gpu-prime, que verifica
+# --- contra sysfs. Aquí únicamente se reporta, nunca se escribe.
+PRIME_STATE="${HOME:-/root}/.local/state/noctaliaq/gpu-prime-state"
+
+ac_online() { cat /sys/class/power_supply/ACAD/online 2>/dev/null || echo "?"; }
+
+prime_state() {
+  [[ -r "$PRIME_STATE" ]] || { printf 'sin estado'; return 1; }
+  printf '%s' "$(<"$PRIME_STATE")"
+}
+
+# Techo de TGP tal como lo tiene nvidia-powerd en este momento. Es dinámico:
+# Dynamic Boost lo mueve solo entre el default y el máximo.
+tgp_ceiling() {
+  local dev
+  dev="$(nvidia_pci)" || return 1
+  [[ "$(cat "$dev/power/runtime_status" 2>/dev/null)" == suspended ]] && return 1
+  command -v nvidia-smi >/dev/null 2>&1 || return 1
+  # sin `exit` en awk: cerrar la tuberia antes de tiempo le manda SIGPIPE a
+  # nvidia-smi (141) y con `pipefail` la funcion entera se daria por fallida
+  nvidia-smi -q -d POWER 2>/dev/null | awk '
+    /GPU Ceiling Power Limit/            { f = 1 }
+    f && cur == "" && /Current Power Limit/ { cur = $(NF-1) }
+    f && max == "" && /Max Power Limit/     { max = $(NF-1) }
+    END { if (cur != "" && max != "") print cur " / " max " W" }'
+}
+
 active_profile() {
   command -v powerprofilesctl >/dev/null 2>&1 && powerprofilesctl get 2>/dev/null && return 0
   [[ -r /sys/firmware/acpi/platform_profile ]] && { cat /sys/firmware/acpi/platform_profile; return 0; }
@@ -219,7 +246,9 @@ cmd_gaming() {
   case "${1:-}" in
     on)
       if command -v powerprofilesctl >/dev/null 2>&1; then
-        powerprofilesctl get > "$GAMING_STATE" 2>/dev/null
+        # solo la primera vez: un 'on' repetido guardaria 'performance' como
+        # perfil previo y 'off' ya no sabria a donde volver
+        [[ -r "$GAMING_STATE" ]] || powerprofilesctl get > "$GAMING_STATE" 2>/dev/null
         powerprofilesctl set "${GAMING_PROFILE:-performance}" 2>/dev/null \
           || warn "no pude fijar el perfil ${GAMING_PROFILE:-performance}"
       fi
@@ -230,6 +259,12 @@ cmd_gaming() {
           && log "dGPU fijada despierta (runtime PM = ${NV_RUNTIME_GAMING:-on})"
       fi
       [[ -n "${GAMING_ON_EXTRA:-}" ]] && sh -c "$GAMING_ON_EXTRA" >/dev/null 2>&1
+      if [[ "$(ac_online)" == 0 ]]; then
+        # con batería noctaliaq-gpu-launch oculta el ICD de NVIDIA al loader
+        # de Vulkan, así que jugarías sobre la iGPU sin enterarte
+        warn "estás con batería: PRIME está en off y Vulkan no ve la dGPU"
+        notify "Ojo: con batería, PRIME está apagado y las apps Vulkan usarán la iGPU" "battery-caution"
+      fi
       log "modo gaming ON"
       notify "Activado — perfil ${GAMING_PROFILE:-performance}, curvas y dGPU despierta"
       ;;
@@ -284,6 +319,16 @@ cmd_status() {
   else
     printf 'dGPU        : ausente (modo integrado)\n'
   fi
+  local ac ps tgp
+  ac="$(ac_online)"; ps="$(prime_state || true)"
+  printf 'PRIME       : %s (AC=%s)' "$ps" "$ac"
+  case "$ac/$ps" in
+    1/on|0/off) printf '\n' ;;
+    "?"/*)      printf '  — sin lectura de AC\n' ;;
+    *)          printf '  ⚠ no concuerda con el cargador\n' ;;
+  esac
+  tgp="$(tgp_ceiling)"
+  [[ -n "$tgp" ]] && printf 'TGP         : %s (lo mueve nvidia-powerd)\n' "$tgp"
   [[ -r "$GAMING_STATE" ]] && printf 'gaming      : ON (previo: %s)\n' "$(<"$GAMING_STATE")"
 }
 
