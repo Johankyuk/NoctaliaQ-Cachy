@@ -72,7 +72,12 @@ _modo_actual(){
        [ -n "$(ls -A /proc/driver/nvidia/gpus 2>/dev/null)" ]; then
         echo Hibrida; return
     fi
-    lspci -nn 2>/dev/null | grep -qi 'nvidia' && echo Hibrida || echo Integrada
+    # Sin "grep -q" en tuberia: cerraria lspci con SIGPIPE. Aqui el rc que
+    # manda es el del grep, asi que hoy no rompe, pero es el mismo patron
+    # que dio el falso negativo en _modulos_cargados. Se materializa antes.
+    local _pci
+    _pci=$(lspci -nn 2>/dev/null)
+    case "$_pci" in *[Nn][Vv][Ii][Dd][Ii][Aa]*) echo Hibrida ;; *) echo Integrada ;; esac
 }
 
 _modo_pendiente(){
@@ -80,10 +85,17 @@ _modo_pendiente(){
     case "$v" in 0) echo Hibrida ;; 1) echo Integrada ;; *) echo '?' ;; esac
 }
 
+# Sin tuberia a proposito. Con "set -o pipefail", un "lsmod | grep -q" mata
+# lsmod con SIGPIPE (rc=141) en cuanto grep encuentra y cierra: la funcion
+# reportaba "sin modulos" con 45 referencias cargadas. Falso negativo que
+# desarma la precondicion de dgpu_disable=1 y lleva directo al -EIO con el
+# nodo mintiendo. Reproducido el 2026-09-09. /proc/modules es el mismo dato
+# que lee lsmod, sin proceso ni tuberia de por medio.
 _modulos_cargados(){
     local m
+    [ -r /proc/modules ] || return 1
     for m in "${NV_MODULES[@]}"; do
-        lsmod 2>/dev/null | grep -q "^${m//-/_} " && return 0
+        grep -q "^${m//-/_} " /proc/modules && return 0
     done
     return 1
 }

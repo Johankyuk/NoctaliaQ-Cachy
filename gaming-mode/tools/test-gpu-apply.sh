@@ -36,7 +36,7 @@ if [ -f "$MARCA" ]; then
 
     echo ""
     if journalctl -t noctaliaq-gpu-apply --since "$(cat "$MARCA")" --no-pager 2>/dev/null \
-         | grep -qi "unbound variable\|command not found\|No such file"; then
+         | grep -i "unbound variable\|command not found\|No such file" >/dev/null; then
         err "El script murio por un error de shell, no por la guardia."
         fallos=$((fallos+1))
     else
@@ -44,7 +44,7 @@ if [ -f "$MARCA" ]; then
     fi
 
     if journalctl -t noctaliaq-gpu-apply --since "$(cat "$MARCA")" --no-pager 2>/dev/null \
-         | grep -qi "Sin intencion"; then
+         | grep -i "Sin intencion" >/dev/null; then
         ok "Abortó por la guardia de intencion, como debe."
     else
         warn "No se vio el mensaje de la guardia — revisa el journal de arriba."
