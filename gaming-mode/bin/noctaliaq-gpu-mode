@@ -7,9 +7,10 @@
 #
 #   /sys/class/firmware-attributes/asus-armoury/attributes/dgpu_disable
 #
-# El firmware apaga la dGPU en el arranque, antes de que exista niri. Por eso
-# TODO cambio requiere reinicio — es limitacion del firmware, igual que con
-# rog-control-center.
+# El firmware apaga la dGPU en el arranque, antes de que exista niri: por eso
+# ir a Integrada exige reinicio. La vuelta a Hibrida NO: escribir 0 dispara un
+# hotplug ACPI y la dGPU reaparece en el bus en la misma sesion (verificado el
+# 2026-09-09: lspci pasa de 0 a 1 y udev carga los modulos solo).
 #
 # Precondicion critica para ir a Integrada: los modulos NVIDIA deben estar
 # descargados al escribir el nodo. Con la sesion grafica viva el firmware
@@ -17,8 +18,13 @@
 # Volver a Hibrida no tiene esa restriccion: en Integrada no hay modulos.
 #
 # Verificacion de tres puntos en cada escritura (codigo de salida, relectura,
-# pending_reboot). El nodo MIENTE tras un write fallido: lee el valor nuevo
-# aunque el firmware lo haya rechazado.
+# estado real del bus PCI). El nodo MIENTE tras un write fallido: lee el valor
+# nuevo aunque el firmware lo haya rechazado.
+#
+# pending_reboot NO es criterio: en esta firmware nunca se ha observado en 1,
+# ni siquiera con cambios que se aplicaron correctamente en ambos sentidos
+# (2026-09-09: Integrada al apagar con pending=0, y Hibrida en vivo con
+# pending=0). Solo se registra como dato informativo.
 #
 #   noctaliaq-gpu-mode              wizard interactivo
 #   noctaliaq-gpu-mode status       estado (texto plano, una cosa por linea)
@@ -53,6 +59,9 @@ STATE_DIR=/var/lib/noctaliaq
 INTENT="$STATE_DIR/gpu-mode-intent"
 
 NV_MODULES=(nvidia_drm nvidia_modeset nvidia_uvm nvidia)
+
+# Lo fija _escribir_dgpu: si el cambio se reflejo en el hardware sin reiniciar.
+APLICADO_EN_VIVO=no
 
 # ---------------------------------------------------------------- lectura ---
 
@@ -137,9 +146,13 @@ _escribir_dgpu(){ # $1 = 0|1
 
     jlog "escribiendo dgpu_disable=$destino (nodo lee $(cat "$DGPU_NODE" 2>/dev/null))"
 
+    # "nodo == destino" solo prueba "ya aplicado" si el HARDWARE coincide: tras
+    # un write rechazado el nodo conserva el valor que no se aplico.
+    _real_destino=$([ "$destino" = 1 ] && echo Integrada || echo Hibrida)
     if [ "$(cat "$DGPU_NODE" 2>/dev/null)" = "$destino" ] && \
-       [ "$(cat "$PENDING" 2>/dev/null || echo 0)" = "0" ]; then
-        ok "El nodo ya esta en $destino y no hay nada encolado."
+       [ "$(_modo_actual)" = "$_real_destino" ]; then
+        APLICADO_EN_VIVO=si
+        ok "Ya estas en $_real_destino y el nodo coincide."
         return 0
     fi
 
@@ -162,14 +175,22 @@ _escribir_dgpu(){ # $1 = 0|1
         return 1
     fi
 
-    if [ "$pend" = "0" ]; then
-        err "Write aceptado y el nodo lee '$destino', pero pending_reboot sigue en 0."
-        warn "El firmware no encolo el cambio. Reiniciar no serviria de nada."
-        return 1
-    fi
+    # El hotplug tarda: el bus enumera y udev carga modulos en unos segundos.
+    local objetivo_real i
+    objetivo_real=$([ "$destino" = 1 ] && echo Integrada || echo Hibrida)
+    APLICADO_EN_VIVO=no
+    for i in 1 2 3 4 5 6 7 8 9 10; do
+        [ "$(_modo_actual)" = "$objetivo_real" ] && { APLICADO_EN_VIVO=si; break; }
+        sleep 1
+    done
 
-    ok "Escrito dgpu_disable=$destino  (pending_reboot=$pend)"
-    jlog "OK dgpu_disable=$destino pending_reboot=$pend"
+    jlog "OK dgpu_disable=$destino pending=$pend en_vivo=$APLICADO_EN_VIVO"
+    if [ "$APLICADO_EN_VIVO" = si ]; then
+        ok "Escrito dgpu_disable=$destino — aplicado en vivo, sin reinicio."
+    else
+        ok "Escrito dgpu_disable=$destino — se aplicara al reiniciar."
+        log "pending_reboot=$pend (informativo; esta firmware no lo levanta)."
+    fi
     return 0
 }
 
@@ -258,8 +279,12 @@ cmd_hybrid(){
     # Volver no necesita TTY: en Integrada no hay modulos que descargar.
     _escribir_dgpu 0 || return 1
     sudo rm -f "$INTENT" 2>/dev/null || rm -f "$INTENT" 2>/dev/null
-    ok "Modo GPU -> Hibrida. Reinicia para aplicar."
-    _ofrecer_reboot
+    if [ "$APLICADO_EN_VIVO" = si ]; then
+        ok "Modo GPU -> Hibrida, activo ahora. No hace falta reiniciar."
+    else
+        ok "Modo GPU -> Hibrida. Reinicia para aplicar."
+        _ofrecer_reboot
+    fi
     return 0
 }
 
@@ -269,8 +294,12 @@ cmd_apply_now(){ # $1 = Integrada|Hibrida
     local destino; [ "$1" = Integrada ] && destino=1 || destino=0
     _escribir_dgpu "$destino" || return 1
     sudo rm -f "$INTENT" 2>/dev/null || rm -f "$INTENT" 2>/dev/null
-    ok "Modo GPU -> $1. Reinicia para aplicar."
-    _ofrecer_reboot
+    if [ "$APLICADO_EN_VIVO" = si ]; then
+        ok "Modo GPU -> $1, activo ahora. No hace falta reiniciar."
+    else
+        ok "Modo GPU -> $1. Reinicia para aplicar."
+        _ofrecer_reboot
+    fi
     return 0
 }
 
