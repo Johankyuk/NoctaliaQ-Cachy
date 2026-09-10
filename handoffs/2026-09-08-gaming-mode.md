@@ -644,3 +644,132 @@ append-only del repo; queda anotado para quien lo consolide.
       `destino=1`.
 - [ ] Heredados: `acpi_backlight=native` a `install.sh`; evaluar el tercer modo
       (Ultimate, `gpu_mux_mode=0`).
+
+---
+
+## Añadido 2026-09-09 (noche) — el brillo no funciona en Híbrida: ocho vías descartadas
+
+**Corrección a este mismo documento.** La sección *"Cerrado 2026-09-09 — modo
+integrado validado + brillo nativo"* afirma:
+
+> *"El brillo queda independiente de NVIDIA de forma permanente — mejora válida
+> en Híbrida también, no solo en Integrada."*
+
+**Es falso.** `acpi_backlight=native` se validó únicamente en Integrada, que era
+el modo en el que se estaba trabajando ese día. La extensión a Híbrida fue
+inferencia, nunca prueba. Al probarlo de verdad esta noche, el panel no responde
+en Híbrida.
+
+No es una regresión: es la primera vez que se prueba.
+
+### El síntoma
+
+En Híbrida, el nodo acepta valores, aplica su curva y emite el evento — el OSD
+de Noctalia reacciona — pero el panel no cambia de brillo:
+
+```
+amdgpu_bl2  set=8000  →  actual_brightness=5734   (estable, no lo pisa nadie)
+DPMS off/on             →  el panel apaga y enciende (enlace físico sano)
+brightnessctl 20%/100%  →  OSD se mueve, pantalla constante
+Fn+F7 / Fn+F8           →  igual
+```
+
+El fallo está en el control de nivel, no en el encendido del panel ni en la
+cadena userspace→kernel, que funciona entera.
+
+En Integrada, el mismo hardware responde de inmediato, teclas Fn incluidas.
+
+### Vías descartadas
+
+| # | Hipótesis | Resultado |
+|---|---|---|
+| 1 | Regresión de kernel 7.2.3 (instalado ese día) | Falla igual en 6.18.48-lts |
+| 2 | Estado sucio del hotplug de la dGPU | Poweroff completo no cambia nada |
+| 3 | EC de ASUS reteniendo el PWM | Descarga del EC (30 s sin cargador) no cambia nada |
+| 4 | Dispositivo equivocado / conector equivocado | `amdgpu_bl2` cuelga de `card2-eDP-2`, único conectado, en la Radeon `65:00.0`. Es el correcto |
+| 5 | `nvidia_wmi_ec_backlight` secuestrando el arbitraje | Blacklist: módulo fuera, `nvidia_0` sigue registrado (lo registra el driver principal desde `01:00.0`). Sin efecto |
+| 6 | `bl_power` de `nvidia_0` | `0` y `4`, ambos sin efecto. Escritura directa a `nvidia_0/brightness` tampoco |
+| 7 | Arbitraje de `acpi_backlight` | Las cuatro opciones agotadas (ver abajo) |
+| 8 | `nvidia_drm.modeset=1` haciendo que niri enumere la dGPU | Con `modeset=0`, `nvidia_0` **desaparece** y `amdgpu_bl2` queda como único dispositivo. **Sigue sin funcionar** |
+
+La 8 es la concluyente: arbitraje perfectamente limpio, un solo dispositivo de
+backlight, NVIDIA fuera de DRM — y el panel sigue sin responder. **No es un
+problema de arbitraje entre drivers.** Con la dGPU en el bus, el PWM del panel
+no es alcanzable por software en esta máquina.
+
+### `acpi_backlight`: las cuatro opciones
+
+| Valor | Dispositivos registrados | Panel |
+|---|---|---|
+| `native` | `amdgpu_bl*` + `nvidia_0` | no |
+| `video` | `acpi_video0` (`max=49`) | no |
+| `vendor` | **ninguno** — `/sys/class/backlight/` vacío | imposible |
+| `none` | ninguno por definición, no se probó | imposible |
+
+`native` sigue siendo el valor correcto. Los demás son iguales o peores.
+
+**Efecto lateral de `video`:** el OSD de Noctalia pasó a moverse de 4 en 4 en
+vez de 5 en 5, porque calcula el porcentaje sobre el `max_brightness` del
+dispositivo activo (49 en `acpi_video0` frente a 65535 en `amdgpu_bl2`). Útil
+como señal de que el dispositivo activo cambió.
+
+### Consecuencia para el módulo: el trade-off es otro
+
+Hasta hoy el modo Integrada se justificaba por 3.8 W y se preguntaba si
+compensaban. **La pregunta cambió: es brillo o dGPU.**
+
+- **Integrada:** brillo funcional (teclas Fn incluidas) + 3.8 W menos. Sin CUDA,
+  sin PRIME.
+- **Híbrida:** dGPU disponible, panel clavado al brillo con el que arrancó.
+
+Eso convierte Integrada en el modo por defecto razonable para uso normal, y
+Híbrida en algo que se activa cuando de verdad hace falta la dGPU. La vuelta es
+barata desde el hallazgo de esta misma sesión: `noctaliaq-gpu-mode hybrid` se
+aplica en vivo, sin reinicio.
+
+### Notas de hardware
+
+- **El sufijo `amdgpu_bl1` / `amdgpu_bl2` no es estable.** Lo asigna el kernel
+  por orden de registro y cambia entre arranques y entre kernels. Todo código
+  que lo referencie debe usar el glob `amdgpu_bl*`. El handoff anterior dice
+  `amdgpu_bl1`; hoy es `bl2`.
+- **`max_brightness` tampoco es estable entre kernels:** 65535 en 7.2.3, 61680
+  en 6.18.48-lts, con el mismo panel. amdgpu lee la curva del ACPI/VBIOS en el
+  arranque (`[drm] Using custom brightness curve` en el journal).
+- `card1-eDP-1` (NVIDIA) existe pero está `disconnected`/`disabled`. El panel es
+  `card2-eDP-2`, en la Radeon.
+
+### Gotchas de la sesión
+
+- **`sudo` fallido en cadena.** Un `sudo` que falla seguido de dos más va
+  directo a `faillock` (`deny=3`). Pasó otra vez esta noche; se comprobó con
+  `faillock --user kyu` (limpio). Ya documentado el 2026-09-08.
+- **`zsh: no matches found: /sys/class/backlight/*/`** significó literalmente
+  que el directorio estaba vacío (con `acpi_backlight=vendor`) — el mismo falso
+  negativo de siempre, pero esta vez el negativo era real. No confundir "el
+  glob no matcheó" con "no puedo leer".
+- **`command` es un builtin, no un binario:** `sudo command ls` falla con
+  `command not found`. Bajo sudo hay que envolver en `bash -c`.
+- **`ls` alias a `eza` delató un hallazgo:** el error `invalid value ... for
+  '--icons'` incluía la ruta del paquete cacheado, que era justo el dato
+  buscado. El gotcha de siempre, esta vez informativo.
+
+### Estado al cerrar
+
+Todo revertido al estado bueno conocido:
+
+- `acpi_backlight=native` en la cmdline, sin `nvidia_drm.modeset=0`
+- `/etc/modprobe.d/nvidia-backlight.conf` eliminado, `mkinitcpio -P` corrido
+- `/etc/udev/rules.d/90-nvidia-backlight.rules` eliminado
+- Kernel 7.2.3-1-cachyos (no se llegó a hacer downgrade; el 7.2.2 sigue en caché)
+
+### Pendientes
+
+- [ ] Decidir si Integrada pasa a ser el modo por defecto del módulo, y si el
+      wizard debería advertir del trade-off de brillo al elegir Híbrida.
+- [ ] Barrer el repo por `amdgpu_bl1` escrito a mano y sustituir por glob.
+- [ ] Vía no explorada: DPCD / `PWM` del panel por debajo del driver, y si
+      `asus-armoury` expone algo. Baja probabilidad; ninguna de las ocho vías
+      apuntó ahí.
+- [ ] Reportar upstream (amd-gfx) si se confirma en otra A16 FA607NUG: panel
+      controlable con la dGPU fuera del bus, no controlable con ella dentro.
