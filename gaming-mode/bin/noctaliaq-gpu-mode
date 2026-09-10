@@ -397,6 +397,9 @@ cmd_apply_shutdown(){
     if echo "$destino" > "$DGPU_NODE" 2>/dev/null; then
         leido=$(cat "$DGPU_NODE" 2>/dev/null)
         pend=$(cat "$PENDING" 2>/dev/null || echo '?')
+        # Escritura propia, sin _escribir_dgpu, a proposito: aquella usa
+        # "sudo tee" y esto corre como root desde ExecStop, sin tty y con el
+        # sistema bajando. No unificar sin resolver eso primero.
         # Criterio: el write devolvio exito Y el nodo lee el destino. NO se
         # exige pending_reboot=1 aqui — se observo que al apagar puede quedar
         # en 0 aunque el cambio sea valido, y revertir por eso tiraba cambios

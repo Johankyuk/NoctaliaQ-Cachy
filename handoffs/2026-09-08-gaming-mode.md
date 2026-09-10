@@ -508,3 +508,139 @@ el ESP no es legible por el usuario, y un glob sobre `/boot` sin sudo da
       confirmo en una corrida real.
 - [ ] `acpi_backlight=native` a `install.sh` (aplica a cualquier maquina con
       este arbitraje, no solo a la TUF).
+
+---
+
+## Añadido 2026-09-09 — el criterio de verificación era el bug
+
+Sesión abierta por un fallo aparente del wizard: se pulsó `1` (Híbrida) desde
+Integrada y el script reportó
+
+```
+[x] Write aceptado y el nodo lee '0', pero pending_reboot sigue en 0.
+[i] El firmware no encolo el cambio. Reiniciar no serviria de nada.
+```
+
+El cambio **sí se había aplicado**. Tres bugs distintos, uno peligroso.
+
+### 1. `pending_reboot` no es criterio de fallo — esta firmware nunca lo levanta
+
+Estado inmediatamente después del supuesto fallo:
+
+```
+dgpu_disable  = 0        gpu_mux_mode = 1 (Optimus)
+lspci         → 01:00.0 RTX 4050 presente
+lsmod         → nvidia con 40 referencias
+prime-run glxinfo → NVIDIA GeForce RTX 4050 Laptop GPU
+```
+
+`last-apply.log` cierra el caso con dos corridas del mismo día, en el sentido
+contrario:
+
+```
+13:28  DUDOSO leido=1 pending=0; devolviendo a 0     ← revirtió un cambio bueno
+13:31  OK dgpu_disable=1 (pending_reboot=0)          ← mismo pending=0, funcionó
+```
+
+`pending_reboot` **nunca se ha observado en 1** en esta máquina, en ninguno de
+los dos sentidos, ni siquiera con cambios que se aplicaron correctamente. No es
+una señal débil: es una señal inexistente.
+
+`cmd_apply_shutdown` ya lo había descubierto el 2026-09-08 y lo documentaba en
+un comentario propio — pero el hallazgo **nunca se portó a `_escribir_dgpu`**,
+que es el camino interactivo. La verificación de tres puntos del encabezado
+queda: código de salida + relectura + **estado real del bus PCI**.
+
+### 2. Integrada → Híbrida se aplica en vivo, sin reinicio
+
+El encabezado afirmaba que *todo* cambio requiere reinicio. Falso en un sentido:
+escribir `dgpu_disable=0` dispara un **hotplug ACPI**, la dGPU reaparece en el
+bus y udev carga los módulos sola, en la misma sesión. Verificado en el journal:
+
+```
+21:35  boot → actual=Integrada, lspci=0, modulos=no
+22:06  tecla 1 → escribiendo dgpu_disable=0 (nodo lee 1)
+22:08  lspci → RTX 4050 presente | lsmod → 40 refs | prime-run → 4050
+```
+
+La asimetría tiene sentido: apagar la dGPU exige que el firmware lo haga en el
+arranque, antes de que exista niri; encenderla no tiene esa restricción.
+
+`_escribir_dgpu` ahora verifica con reintentos contra `_modo_actual` (el hotplug
+tarda unos segundos) y fija `APLICADO_EN_VIVO`, que `cmd_hybrid` y
+`cmd_apply_now` usan para no ofrecer un reinicio innecesario.
+
+El early return también cambió: `nodo == destino` solo prueba "ya aplicado" si
+el **hardware** coincide. Tras un write rechazado el nodo conserva el valor que
+no se aplicó, así que el nodo solo nunca basta.
+
+### 3. ⚠️ Grave: `_modulos_cargados` daba falso negativo por SIGPIPE
+
+`status` reportaba `Modulos NVIDIA: ninguno` con `nvidia` cargado y 45
+referencias. Reproducido en limpio:
+
+```bash
+bash -c 'set -uo pipefail; lsmod | grep -q "^nvidia_drm "; echo "rc=$?"'  # rc=141
+bash -c 'lsmod | grep -q "^nvidia_drm "; echo "rc=$?"'                    # rc=0
+```
+
+Con `set -o pipefail`, `grep -q` cierra la tubería al primer match y `lsmod`
+muere con SIGPIPE (141), que `pipefail` propaga como fallo de la función.
+
+**Por qué es grave:** `_modulos_cargados` es la precondición que impide escribir
+`dgpu_disable=1` con la sesión gráfica viva. Con el falso negativo el write
+llega al firmware, responde `-EIO`, y se cae justo en el escenario del nodo que
+miente — sin ningún guardrail restante. Es exactamente contra lo que se escribió
+esa precondición.
+
+Es el mismo bug ya corregido en `nvidia-smi | awk` el 2026-09-08. Volvió a
+aparecer en otra función.
+
+**Fix:** leer `/proc/modules` directamente, sin tubería (mismo dato que lee
+`lsmod`, sin proceso intermedio).
+
+**Barrido del resto del módulo.** Dos supervivientes más del mismo patrón:
+
+- `_modo_actual`: `lspci | grep -qi nvidia`. Hoy no rompe porque el rc que manda
+  es el del `grep`, pero es la rama de fallback que decide el modo cuando
+  `/proc/driver/nvidia/gpus` no existe — justo el caso Integrada→Híbrida recién
+  aplicada. Frágil por accidente, no por diseño. Materializa `lspci` y usa `case`.
+- `test-gpu-apply.sh` (dos sitios): ahí el rc del `grep` **sí** decide si el test
+  pasa. Cambiado a `grep -i ... >/dev/null`, que consume la entrada en vez de
+  cortarla.
+
+**Regla:** `cmd | grep -q` es incompatible con `pipefail`. Usar `>/dev/null`, o
+leer el archivo directamente cuando exista.
+
+### Decisión: no unificar `cmd_apply_shutdown` con `_escribir_dgpu`
+
+Con `pending_reboot` fuera del criterio, los dos convergieron: ya no hay
+divergencia de comportamiento, solo duplicación. Unificar tiene coste real —
+`_escribir_dgpu` escribe con `sudo tee`, y el camino de apagado corre como root
+desde `ExecStop`, sin tty y con el sistema bajando. Meter `sudo` ahí introduce
+una dependencia nueva en la ruta más difícil de probar del módulo, ya validada
+en vivo. Queda un comentario en el código para que no se "arregle" después.
+
+### Commits
+
+- `b674deb` — pending_reboot informativo + detección de hotplug en vivo
+- `5f2eef8` — eliminado `cmd | grep -q` del resto del módulo
+
+### Nota sobre este documento
+
+La sección *"Cerrado 2026-09-09 — modo integrado validado"* aparece **duplicada
+casi entera** más arriba (dos veces la medición de 3.8 W, el gotcha del nodo que
+miente y el procedimiento validado). No se edita en sitio por la convención
+append-only del repo; queda anotado para quien lo consolide.
+
+### Pendientes
+
+- [ ] Probar `cmd_hybrid` desde Integrada real con el parche puesto: debe
+      reportar "activo ahora" y no ofrecer reinicio. El early return nuevo
+      tampoco se ha ejercitado (`cmd_hybrid` corta antes con su propio chequeo).
+- [ ] `_escribir_dgpu` sigue sin verificar el bus cuando el destino es
+      Integrada — ahí el cambio no es en vivo, así que `APLICADO_EN_VIVO=no` es
+      correcto, pero el bucle de 10 s se gasta para nada. Cortar temprano si
+      `destino=1`.
+- [ ] Heredados: `acpi_backlight=native` a `install.sh`; evaluar el tercer modo
+      (Ultimate, `gpu_mux_mode=0`).
