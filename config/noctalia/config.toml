@@ -109,6 +109,8 @@ minimum_brightness = 0.049999997019767761
 sync_all_monitors = true
 
 [calendar]
+    event_date_format = "%A %e %B"
+    event_time_format = "{:%-I:%M:%S %p}"
 enabled = true
 refresh_minutes = 15
 
@@ -121,8 +123,6 @@ sidebar_section = "full"
 width = 700
 
     [control_center.calendar]
-    event_date_format = "%A %e %B"
-    event_time_format = "{:%-I:%M:%S %p}"
     show_events_card = true
     show_week_numbers = false
 
