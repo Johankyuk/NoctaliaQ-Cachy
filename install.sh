@@ -87,6 +87,28 @@ else
   echo "Ni Sober ni mcpelauncher están instalados, se omite."
 fi
 
+echo "== PRIME offload en flatpaks (extension GL de NVIDIA) =="
+if command -v nvidia-smi &>/dev/null && flatpak info io.mrarm.mcpelauncher &>/dev/null; then
+  DRV=$(nvidia-smi --query-gpu=driver_version --format=csv,noheader | tr "." "-")
+  if [ -z "$DRV" ]; then echo "ERROR: no se pudo leer driver_version" >&2; exit 1; fi
+  flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+  # La extension debe coincidir EXACTO con el driver del host; si no, flatpak no monta
+  # el GL de NVIDIA dentro del sandbox y ninguna env var de PRIME tiene efecto.
+  flatpak install -y flathub "org.freedesktop.Platform.GL.nvidia-$DRV" \
+                            "org.freedesktop.Platform.GL32.nvidia-$DRV"
+  if ! flatpak list --runtime | grep -q "GL.nvidia-$DRV"; then
+    echo "ERROR: falta org.freedesktop.Platform.GL.nvidia-$DRV tras el install" >&2; exit 1
+  fi
+  # device=all: --device=dri NO expone /dev/nvidia*, que el offload necesita.
+  flatpak override --user io.mrarm.mcpelauncher \
+    --device=all \
+    --env=__NV_PRIME_RENDER_OFFLOAD=1 \
+    --env=__GLX_VENDOR_LIBRARY_NAME=nvidia \
+    --env=__VK_LAYER_NV_optimus=NVIDIA_only
+else
+  echo "Sin NVIDIA o sin mcpelauncher, se omite PRIME en flatpaks."
+fi
+
 echo "== Dolphin (paquete + color scheme) =="
 if ! pacman -Qi dolphin &>/dev/null; then
   sudo pacman -S --needed --noconfirm dolphin
