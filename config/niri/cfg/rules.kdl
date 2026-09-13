@@ -44,8 +44,8 @@
         }
     }
 
-// Dolphin — opacity para que se vea el blur global que ya está activo.
+// Nautilus — opacity para que se vea el blur global que ya está activo.
 window-rule {
-    match app-id=r#"^org\.kde\.dolphin$"#
+    match app-id=r#"^org\.gnome\.Nautilus$"#
     opacity 0.75
 }

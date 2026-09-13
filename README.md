@@ -30,7 +30,7 @@ Todo archivo que reemplaza se respalda como `archivo.bak.<timestamp>` antes de s
   (sat=1.6 val=0.85).
 - **MangoHud**: paquete + `MangoHud.conf` + overrides para Sober y mcpelauncher si están
   instalados (Vulkan layer vía Flatpak).
-- **Dolphin**: paquete + color scheme Noctalia.
+- **Nautilus + papirus-icon-theme**: gestor de archivos e iconos; el recoloreo lo hace la plantilla `papirus-icons` de Noctalia.
 - **niri**: todos los `.kdl` de `config/niri/cfg/` + `config.kdl` (window-rules, blur).
 - **Zsh**: paquete + `cachyos-zsh-config` + zoxide + eza + `.zshrc`/`.p10k.zsh`, y cambia la
   shell por defecto del usuario (`chsh`, pide password del usuario).
@@ -80,13 +80,10 @@ tocar el display manager del sistema, o dependen de contexto que varía por máq
 - **`greeter-setup/`** — reemplaza SDDM por greetd + noctalia-greeter. Requiere compilar
   `noctalia-greeter` de AUR primero. Ver `greeter-setup/README.md` para el procedimiento
   y el rollback si falla.
-- **`file-manager-fix/`** — fija Dolphin como manejador de `inode/directory` por sobre
-  Nautilus sin desinstalarlo (es dependencia indirecta de niri). `./file-manager-fix/set-default-filemanager.sh`, idempotente.
 
 ## Estructura
 config/ — dotfiles: noctalia, niri, foot, zsh, MangoHud
 bin/ — scripts desplegados a ~/.local/bin
 keyd/ — /etc/keyd/default.conf (tap de Super, requiere root)
 greeter-setup/ — módulo manual: SDDM → greetd
-file-manager-fix/ — módulo manual: Dolphin default
 handoffs/ — notas de sesiones de trabajo, no se despliegan

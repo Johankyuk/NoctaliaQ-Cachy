@@ -109,13 +109,14 @@ else
   echo "Sin NVIDIA o sin mcpelauncher, se omite PRIME en flatpaks."
 fi
 
-echo "== Dolphin (paquete + color scheme) =="
-if ! pacman -Qi dolphin &>/dev/null; then
-  sudo pacman -S --needed --noconfirm dolphin
-else
-  echo "dolphin ya instalado, se omite pacman."
-fi
-kwriteconfig6 --file dolphinrc --group UiSettings --key ColorScheme noctalia
+echo "== Gestor de archivos (nautilus) + iconos Papirus =="
+for pkg in nautilus papirus-icon-theme; do
+  if ! pacman -Qi "$pkg" &>/dev/null; then
+    sudo pacman -S --needed --noconfirm "$pkg"
+  else
+    echo "$pkg ya instalado, se omite pacman."
+  fi
+done
 
 echo "== niri cfg =="
 for f in "$REPO_DIR"/config/niri/cfg/*.kdl; do

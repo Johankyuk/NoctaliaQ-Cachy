@@ -677,7 +677,7 @@ wallpaper_scheme = "dysfunctional"
 
     [theme.templates]
     builtin_ids = [ "btop", "cava", "foot", "gtk3", "gtk4", "kcolorscheme", "niri", "qt" ]
-    community_ids = [ "zen-browser", "discord", "gimp", "vscode", "heroiclauncher", "steam", "fastfetch", "obs" ]
+    community_ids = [ "ytm-player", "zen-browser", "discord", "gimp", "libreoffice", "vscode", "heroiclauncher", "steam", "fastfetch", "obs", "fcitx5", "papirus-icons", "snappy-switcher", "whitesur-icons" ]
     enable_builtin_templates = true
     enable_community_templates = true
 
