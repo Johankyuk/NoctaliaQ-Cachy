@@ -1,7 +1,7 @@
 # NoctaliaQ-Cachy
 
 Setup completo de Noctalia v5 + niri en CachyOS (KyuCachy). Config, scripts de GPU PRIME,
-color-sync de teclado/MangoHud, cursor, zsh (cachyos-zsh-config + p10k), foot y
+color-sync de teclado/MangoHud, cursor, zsh (cachyos-zsh-config + p10k), foot, keyd y
 overrides de MangoHud para flatpaks.
 
 ## Instalación rápida (cualquier máquina, sin llave SSH)
@@ -43,6 +43,10 @@ Todo archivo que reemplaza se respalda como `archivo.bak.<timestamp>` antes de s
 - **Foot**: paquete + config + tema dinámico Noctalia.
 - **Zen Browser**: paquete `zen-browser-bin` (repo `cachyos`, sin AUR).
 - **Miri**: `config.toml` + servicio `systemd --user` (habilitado, arranca junto con niri).
+- **keyd**: paquete + `/etc/keyd/default.conf` (requiere root). Mapea el tap de Super a
+  `F13`, que XKB entrega como `XF86Tools` — ese es el bind del control center en niri.
+  El hold sigue siendo Super normal; el umbral de `overloadt2` (250 ms) aplica igual al
+  tap y al arrastre de flotantes con Super+click.
 - **Scripts** de `bin/` → `~/.local/bin/` (kbd-color-sync, mangohud-color-sync,
   noctaliaq-gpu-prime, noctaliaq-gpu-launch, noctaliaq-gpu-flatpak-sync).
 
@@ -82,6 +86,7 @@ tocar el display manager del sistema, o dependen de contexto que varía por máq
 ## Estructura
 config/ — dotfiles: noctalia, niri, foot, zsh, MangoHud
 bin/ — scripts desplegados a ~/.local/bin
+keyd/ — /etc/keyd/default.conf (tap de Super, requiere root)
 greeter-setup/ — módulo manual: SDDM → greetd
 file-manager-fix/ — módulo manual: Dolphin default
 handoffs/ — notas de sesiones de trabajo, no se despliegan
