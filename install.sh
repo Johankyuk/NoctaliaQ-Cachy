@@ -184,6 +184,21 @@ backup_and_copy "$REPO_DIR/config/systemd-user/miri.service" "$HOME/.config/syst
 systemctl --user daemon-reload
 systemctl --user enable miri.service
 
+echo "== keyd (tap de Super -> F13/XF86Tools) =="
+if ! pacman -Qi keyd &>/dev/null; then
+  sudo pacman -S --needed --noconfirm keyd
+else
+  echo "keyd ya instalado, se omite pacman."
+fi
+sudo mkdir -p /etc/keyd
+if [ -e /etc/keyd/default.conf ]; then
+  sudo cp /etc/keyd/default.conf "/etc/keyd/default.conf.bak.$(date +%s)"
+fi
+sudo cp "$REPO_DIR/keyd/default.conf" /etc/keyd/default.conf
+sudo cmp -s "$REPO_DIR/keyd/default.conf" /etc/keyd/default.conf || { echo "ERROR: /etc/keyd/default.conf no coincide con el repo"; exit 1; }
+sudo systemctl enable --now keyd
+sudo keyd reload
+
 echo "== Scripts .local/bin =="
 mkdir -p "$HOME/.local/bin"
 for f in "$REPO_DIR"/bin/*; do
