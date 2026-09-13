@@ -57,6 +57,7 @@ son los mismos.
 
 ## Pendiente
 
-- Aplicar en la Alienware (`git pull` + `install.sh`): allá también hay que
-  revertir a mano el `xdg-mime` y los `.desktop` ocultos si se corrió el
-  módulo.
+- Aplicar en la Alienware: basta `git pull` + `./install.sh`; el revert del
+  `xdg-mime` y los `.desktop` ocultos ya va dentro del script. Revisar el
+  `diff` del `config.toml` desplegado antes, por drift local, y la lista de
+  `pacman -Rs --print dolphin` allá antes de desinstalar.
