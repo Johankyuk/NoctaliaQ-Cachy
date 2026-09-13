@@ -110,6 +110,21 @@ else
 fi
 
 echo "== Gestor de archivos (nautilus) + iconos Papirus =="
+# Revert del extinto file-manager-fix/ (Dolphin como inode/directory +
+# .desktop de Nautilus ocultos). Idempotente: no hace nada si nunca se corrió.
+rm -f "$HOME/.local/share/applications/org.gnome.Nautilus.desktop" \
+      "$HOME/.local/share/applications/nautilus-autorun-software.desktop"
+update-desktop-database "$HOME/.local/share/applications" 2>/dev/null
+if [ "$(xdg-mime query default inode/directory)" != "org.gnome.Nautilus.desktop" ]; then
+  xdg-mime default org.gnome.Nautilus.desktop inode/directory
+  if [ "$(xdg-mime query default inode/directory)" != "org.gnome.Nautilus.desktop" ]; then
+    echo "ERROR: inode/directory sigue en $(xdg-mime query default inode/directory)" >&2
+    exit 1
+  fi
+  echo "inode/directory reapuntado a Nautilus."
+else
+  echo "inode/directory ya en Nautilus, se omite."
+fi
 for pkg in nautilus papirus-icon-theme; do
   if ! pacman -Qi "$pkg" &>/dev/null; then
     sudo pacman -S --needed --noconfirm "$pkg"
