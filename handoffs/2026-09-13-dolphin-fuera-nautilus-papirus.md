@@ -61,3 +61,30 @@ son los mismos.
   `xdg-mime` y los `.desktop` ocultos ya va dentro del script. Revisar el
   `diff` del `config.toml` desplegado antes, por drift local, y la lista de
   `pacman -Rs --print dolphin` allá antes de desinstalar.
+
+## Hallazgo colateral: hook de RGB apuntando a un script ausente
+
+El `diff` de cierre (repo vs. desplegado) salió limpio — solo expansión de
+`HOME/` y `HOOK`. Pero un `ls` de los binarios referenciados reveló que
+`~/.config/noctalia/scripts/rgb-sync-hook.sh` **no existía**, pese a que
+cuatro hooks lo invocan (`colors_changed`, `started`, `theme_mode_changed`,
+`wallpaper_changed`).
+
+El script sí está versionado y `install.sh` sí lo despliega (líneas 28-29),
+así que la copia se borró a mano en algún punto posterior al último
+`install.sh`. Restaurado con `cp` + `chmod +x`.
+
+**Lección:** un `diff` limpio de configs no prueba nada sobre los archivos
+que esas configs *referencian*. Mismo modo de falla silenciosa que
+`launch_apps_custom_command` en `60ea379`: la ruta parsea, el hook dispara,
+el binario no está, nadie se entera.
+
+Verificación end-to-end: `noctalia msg wallpaper-random` y comprobar el
+mtime de `~/.cache/noctalia/palette-raw.conf`. Los hooks corren como hijos
+del daemon y **no escriben a journald**, así que `journalctl` no sirve aquí.
+
+## Pendiente derivado
+
+- [ ] `install.sh` podría verificar la existencia de cada binario/script
+      referenciado en los hooks del `config.toml` tras desplegarlo, con
+      `exit 1` si falta alguno.
