@@ -200,6 +200,21 @@ backup_and_copy "$REPO_DIR/config/systemd-user/miri.service" "$HOME/.config/syst
 systemctl --user daemon-reload
 systemctl --user enable miri.service
 
+# dGPU: sesion siempre arranca en ahorro (estado offload off, gamer mode off).
+# Encendido en caliente al conectar AC (hooks battery_*) o con Mod+Alt+G.
+backup_and_copy "$REPO_DIR/config/systemd-user/noctaliaq-gpu-boot.service" "$HOME/.config/systemd/user/noctaliaq-gpu-boot.service"
+systemctl --user daemon-reload
+systemctl --user enable noctaliaq-gpu-boot.service
+
+# Zen con EGL de Mesa: sin esto su proceso de video abre la NVIDIA y bloquea el apagado.
+backup_and_copy "$REPO_DIR/config/applications/zen.desktop" "$HOME/.local/share/applications/zen.desktop"
+update-desktop-database "$HOME/.local/share/applications" 2>/dev/null
+
+# Apagado fisico de la dGPU (solo laptops ASUS con dgpu_disable). Requiere root.
+if [[ -e /sys/devices/platform/asus-nb-wmi/dgpu_disable ]]; then
+    sudo "$REPO_DIR/gpu-setup/deploy-dgpu.sh" || echo "AVISO: deploy-dgpu.sh fallo"
+fi
+
 echo "== keyd (tap de Super -> F13/XF86Tools) =="
 if ! pacman -Qi keyd &>/dev/null; then
   sudo pacman -S --needed --noconfirm keyd

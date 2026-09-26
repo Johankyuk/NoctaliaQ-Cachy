@@ -1,42 +1,101 @@
 #!/usr/bin/env bash
-# noctaliaq-gpu-prime — activa/desactiva el estado de PRIME offload.
-# El estado lo lee noctaliaq-gpu-launch en cada lanzamiento del launcher.
-# Verifica AC real en sysfs (ground truth) en vez de confiar ciegamente en el
-# argumento que manda Noctalia: sus hooks battery_plugged/battery_discharging
-# pueden disparar erróneo durante la transición de estado de la batería
-# (visto: pending-charge -> discharging tarda ~9s en asentarse en UPower,
-# y Noctalia puede leer un estado intermedio mal). flock + debounce de 300ms
-# evitan que invocaciones concurrentes o fantasma pisen el estado correcto.
-# También dispara noctaliaq-gpu-flatpak-sync acá mismo (no via array de hooks):
-# Noctalia solo ejecuta el primer ítem de un array en hooks battery_*, a diferencia
-# de colors_changed que sí corre todos — así que se encadena a mano en vez de confiar en eso.
+# noctaliaq-gpu-prime — estado de PRIME offload + dGPU fisica + gamer mode.
+#   boot    (servicio de usuario al iniciar sesion) estado off, gamer off, registra AC actual.
+#           El apagado fisico al arrancar lo hace noctaliaq-dgpu-boot.service (sistema): pkexec
+#           no funciona desde el systemd de usuario porque esta fuera de la sesion de logind.
+#   on|off  hooks de bateria. Manda sysfs, no el argumento. Solo actua si el AC cambio respecto
+#           al ultimo evento real (filtra fantasmas y respeta un toggle manual hasta el proximo
+#           conectar/desconectar). AC=1 -> dGPU on + gamer on; AC=0 -> dGPU off + gamer off.
+#   toggle  manual (Mod+Alt+G). Gamer mode solo si hay corriente.
+# Hardware via pkexec /usr/local/bin/noctaliaq-dgpu (regla polkit org.noctaliaq.dgpu).
+# rc del helper: 0 ok, 2 maquina sin dgpu_disable (sigue solo con estado), 3 dGPU en uso
+# (offload queda off y el apagado se reintenta cada 30s en segundo plano, max 1h).
+# flatpak-sync se encadena aca: Noctalia solo corre el primer item de hooks battery_*.
 set -uo pipefail
-STATE=~/.local/state/noctaliaq/gpu-prime-state
-LOCK=~/.local/state/noctaliaq/gpu-prime.lock
-mkdir -p "$(dirname "$STATE")"
-
+DIR=~/.local/state/noctaliaq
+STATE=$DIR/gpu-prime-state
+LAST_AC=$DIR/last-ac
+GAMER=$DIR/gamer-state
+LOCK=$DIR/gpu-prime.lock
+RETRY_LOCK=$DIR/dgpu-retry.lock
+AC_PATH=/sys/class/power_supply/ACAD/online
+NOCTALIA=/usr/bin/noctalia
+DGPU=/usr/local/bin/noctaliaq-dgpu
+TAG=noctaliaq-gpu-prime
+mkdir -p "$DIR"
 exec 200>"$LOCK"
-flock -w 5 200 || { logger -t noctaliaq-gpu-prime "no se pudo tomar el lock, abortando"; exit 1; }
-
+flock -w 5 200 || { logger -t $TAG "no se pudo tomar el lock, abortando"; exit 1; }
 case "${1:-}" in
-  on|off) ;;
-  *) echo "uso: noctaliaq-gpu-prime [on|off]" >&2; exit 1 ;;
+  on|off|toggle|boot) ;;
+  *) echo "uso: noctaliaq-gpu-prime [on|off|toggle|boot]" >&2; exit 1 ;;
 esac
-
-sleep 0.3
-AC_ONLINE=$(cat /sys/class/power_supply/ACAD/online 2>/dev/null || echo 0)
-[[ "$AC_ONLINE" == "1" ]] && REAL="on" || REAL="off"
-
-CURRENT=$(cat "$STATE" 2>/dev/null || echo "")
-if [[ "$CURRENT" == "$REAL" ]]; then
-  [[ "$REAL" != "${1:-}" ]] && logger -t noctaliaq-gpu-prime "evento '$1' descartado, sysfs dice '$REAL' (sin cambio)"
-  exit 0
-fi
-
-echo "$REAL" > "$STATE"
-if [[ "$REAL" == "on" ]]; then
-  logger -t noctaliaq-gpu-prime "PRIME offload activado (AC) [sysfs verificado]"
-else
-  logger -t noctaliaq-gpu-prime "PRIME offload desactivado (bateria) [sysfs verificado]"
-fi
-~/.local/bin/noctaliaq-gpu-flatpak-sync
+ac() { cat "$AC_PATH" 2>/dev/null || echo 0; }
+notify() { command -v notify-send >/dev/null && notify-send -a "GPU" -i video-display "$1" "$2"; }
+hw() {
+  [[ -x "$DGPU" ]] || return 2
+  pkexec "$DGPU" "$1" >/dev/null 2>&1
+}
+retry_off() {
+  logger -t $TAG "dGPU ocupada: reintento de apagado cada 30s (max 1h)"
+  setsid bash -c '
+    exec 9>"$1"; flock -n 9 || exit 0
+    for i in $(seq 1 120); do
+      sleep 30
+      [[ "$(cat "$2" 2>/dev/null)" == off ]] || exit 0
+      pkexec "$3" off >/dev/null 2>&1; rc=$?
+      [[ $rc -ne 3 ]] && { logger -t noctaliaq-gpu-prime "reintento de apagado terminado (rc=$rc)"; exit 0; }
+    done' _ "$RETRY_LOCK" "$STATE" "$DGPU" </dev/null >/dev/null 2>&1 200>&- &
+}
+gamer() {
+  [[ "$(cat "$GAMER" 2>/dev/null)" == "$1" ]] && return 0
+  local verb=disable; [[ "$1" == on ]] && verb=enable
+  if "$NOCTALIA" msg plugin nomadcxx/gamer-mode:service all "$verb" >/dev/null 2>&1; then
+    echo "$1" > "$GAMER"; logger -t $TAG "gamer mode $1"
+  else
+    logger -t $TAG "gamer mode $1 FALLO (daemon noctalia abajo?)"
+  fi
+}
+set_gpu() {
+  local prev rc; prev=$(cat "$STATE" 2>/dev/null)
+  if [[ "$1" == on ]]; then
+    hw on; rc=$?
+    if [[ $rc -ne 0 && $rc -ne 2 ]]; then
+      logger -t $TAG "no se pudo encender la dGPU (rc=$rc); offload sigue off"
+      notify "dGPU" "No se pudo encender (rc=$rc)"; return 1
+    fi
+    echo on > "$STATE"
+  else
+    echo off > "$STATE"
+    hw off; rc=$?
+    case $rc in 0|2) ;; 3) retry_off ;; *) logger -t $TAG "apagado de la dGPU fallo (rc=$rc)" ;; esac
+  fi
+  if [[ "$prev" != "$1" ]]; then
+    logger -t $TAG "PRIME offload $1 ($2)"
+    ~/.local/bin/noctaliaq-gpu-flatpak-sync
+  fi
+}
+case "$1" in
+  boot)
+    echo off > "$STATE"; echo off > "$GAMER"; ac > "$LAST_AC"
+    logger -t $TAG "inicio de sesion: offload off, gamer off"
+    ~/.local/bin/noctaliaq-gpu-flatpak-sync
+    ;;
+  on|off)
+    sleep 0.3
+    NOW=$(ac)
+    if [[ "$(cat "$LAST_AC" 2>/dev/null)" == "$NOW" ]]; then
+      logger -t $TAG "evento '$1' descartado: AC sin cambio ($NOW)"; exit 0
+    fi
+    echo "$NOW" > "$LAST_AC"
+    if [[ "$NOW" == 1 ]]; then set_gpu on "AC conectado [sysfs]" && gamer on
+    else set_gpu off "bateria [sysfs]"; gamer off; fi
+    ;;
+  toggle)
+    if [[ "$(cat "$STATE" 2>/dev/null)" == on ]]; then
+      set_gpu off manual; gamer off; notify "dGPU en ahorro" "Gamer mode desactivado"
+    elif set_gpu on manual; then
+      if [[ "$(ac)" == 1 ]]; then gamer on; notify "dGPU activa" "Gamer mode activado"
+      else notify "dGPU activa" "Sin corriente: gamer mode no se activa"; fi
+    fi
+    ;;
+esac

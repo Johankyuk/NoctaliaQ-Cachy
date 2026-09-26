@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+# noctaliaq-dgpu — enciende/apaga fisicamente la dGPU en laptops ASUS (dgpu_disable).
+# Corre como root: via pkexec (accion polkit org.noctaliaq.dgpu) o desde noctaliaq-dgpu-boot.service.
+#   off     para nvidia-powerd, verifica que nadie use la dGPU, la quita del bus PCI y pone
+#           dgpu_disable=1. Si hay procesos usandola sale con 3 sin tocar nada.
+#   on      dgpu_disable=0, rescan PCI, carga nvidia_drm, arranca nvidia-powerd.
+#   status  imprime on/off.
+# Sale con 2 si la maquina no tiene asus-nb-wmi (ej. Alienware): el llamador sigue sin hardware.
+# Requiere niri con ignore-drm-device sobre la dGPU; si niri la abre, el apagado siempre da 3.
+set -uo pipefail
+G=/sys/devices/platform/asus-nb-wmi/dgpu_disable
+TAG=noctaliaq-dgpu
+log() { logger -t $TAG "$*"; echo "$*"; }
+for i in 1 2 3 4 5; do [[ -e $G ]] && break; sleep 1; done
+[[ -e $G ]] || { echo "sin asus-nb-wmi/dgpu_disable: no soportado"; exit 2; }
+nv_devs() { for d in /sys/bus/pci/devices/*; do [[ "$(cat "$d/vendor")" == 0x10de ]] && echo "${d##*/}"; done; }
+present() { [[ -n "$(nv_devs)" ]]; }
+case "${1:-}" in
+  status)
+    if [[ "$(cat $G)" == 0 ]] && present; then echo on; else echo off; fi
+    ;;
+  off)
+    if [[ "$(cat $G)" == 1 ]] && ! present; then exit 0; fi
+    systemctl stop nvidia-powerd 2>/dev/null
+    sleep 0.5
+    EX=()
+    for f in /dev/nvidia[0-9]* /dev/nvidiactl; do [[ -e $f ]] && EX+=("$f"); done
+    for b in $(nv_devs); do for f in /dev/dri/by-path/pci-$b-*; do [[ -e $f ]] && EX+=("$f"); done; done
+    H=""
+    (( ${#EX[@]} )) && H=$(fuser "${EX[@]}" 2>/dev/null | tr -cs '0-9' '\n' | sort -u | tr '\n' ' ')
+    if [[ -n "${H// }" ]]; then
+      log "off pospuesto: dGPU en uso por$(for p in $H; do printf ' %s(%s)' "$(cat /proc/$p/comm 2>/dev/null)" "$p"; done)"
+      exit 3
+    fi
+    for b in $(nv_devs | sort -r); do echo 1 > "/sys/bus/pci/devices/$b/remove"; done
+    sleep 1
+    echo 1 > $G
+    if present; then log "FALLO: la dGPU sigue en el bus"; exit 1; fi
+    log "dGPU apagada (dgpu_disable=1)"
+    ;;
+  on)
+    if [[ "$(cat $G)" == 0 ]] && present; then systemctl start nvidia-powerd 2>/dev/null; exit 0; fi
+    echo 0 > $G
+    sleep 1
+    echo 1 > /sys/bus/pci/rescan
+    for i in 1 2 3 4 5; do present && break; sleep 1; done
+    present || { log "FALLO: la dGPU no aparecio tras el rescan"; exit 1; }
+    modprobe nvidia_drm 2>/dev/null
+    systemctl start nvidia-powerd 2>/dev/null
+    log "dGPU encendida (dgpu_disable=0)"
+    ;;
+  *) echo "uso: noctaliaq-dgpu [on|off|status]" >&2; exit 1 ;;
+esac

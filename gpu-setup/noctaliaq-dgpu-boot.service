@@ -1,0 +1,9 @@
+[Unit]
+Description=NoctaliaQ: dGPU apagada fisicamente al arrancar
+After=systemd-modules-load.service
+Before=display-manager.service greetd.service
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/noctaliaq-dgpu off
+[Install]
+WantedBy=multi-user.target
