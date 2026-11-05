@@ -491,7 +491,7 @@ frame_rate = 144
 
 [plugins]
 auto_update = "all"
-enabled = [ "noctalia/screen_recorder", "kv7499/asus-fan" ]
+enabled = [ "noctalia/screen_recorder", "kv7499/asus-fan", "h465855hgg/lyrics" ]
 
     [[plugins.source]]
     enabled = true

@@ -290,8 +290,8 @@ sudo install -Dm644 "$REPO_DIR/logind/50-noctaliaq-powerkey.conf" /etc/systemd/l
 sudo systemctl kill -s HUP systemd-logind
 
 # KYU-TERMINAL-APPS
-echo "== Apps de terminal (cava, cmatrix) =="
-for pkg in cava cmatrix; do
+echo "== Apps de terminal (cava, cmatrix, playerctl) =="
+for pkg in cava cmatrix playerctl; do
   pacman -Qi "$pkg" &>/dev/null || sudo pacman -S --needed --noconfirm "$pkg"
 done
 # KYU-LAVAT
@@ -308,4 +308,4 @@ for f in "$REPO_DIR"/bin/*; do
   chmod +x "$HOME/.local/bin/$(basename "$f")"
 done
 
-echo "✓ terminado — hacé logout/login y elegí Umbriel para que todo tome efecto"
+echo "✓ terminado — haz logout/login y elige Umbriel para que todo tome efecto"
