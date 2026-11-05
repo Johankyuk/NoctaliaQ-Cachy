@@ -228,20 +228,6 @@ if [[ -e /sys/devices/platform/asus-nb-wmi/dgpu_disable ]]; then
     sudo "$REPO_DIR/gpu-setup/deploy-dgpu.sh" || echo "AVISO: deploy-dgpu.sh fallo"
 fi
 
-echo "== keyd (tap de Super -> F13/XF86Tools) =="
-if ! pacman -Qi keyd &>/dev/null; then
-  sudo pacman -S --needed --noconfirm keyd
-else
-  echo "keyd ya instalado, se omite pacman."
-fi
-sudo mkdir -p /etc/keyd
-if [ -e /etc/keyd/default.conf ]; then
-  sudo cp /etc/keyd/default.conf "/etc/keyd/default.conf.bak.$(date +%s)"
-fi
-sudo cp "$REPO_DIR/keyd/default.conf" /etc/keyd/default.conf
-sudo cmp -s "$REPO_DIR/keyd/default.conf" /etc/keyd/default.conf || { echo "ERROR: /etc/keyd/default.conf no coincide con el repo"; exit 1; }
-sudo systemctl enable --now keyd
-sudo keyd reload
 
 echo "== Umbriel (compositor adicional a niri) =="
 command -v paru >/dev/null 2>&1 || sudo pacman -S --needed --noconfirm paru
