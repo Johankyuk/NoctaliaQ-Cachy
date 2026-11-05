@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=CMatrix
+Comment=Lluvia de Matrix en terminal
+Exec=foot --app-id=noctaliaq-cmatrix --title=CMatrix cmatrix -ab
+Icon=utilities-terminal
+Categories=System;Utility;
+Keywords=cmatrix;matrix;

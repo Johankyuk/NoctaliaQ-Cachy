@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Cava
+Comment=Visualizador de audio en terminal
+Exec=foot --app-id=noctaliaq-cava --title=Cava cava
+Icon=utilities-terminal
+Categories=AudioVideo;Audio;
+Keywords=cava;audio;visualizador;espectro;

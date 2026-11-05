@@ -289,6 +289,16 @@ echo "== Boton de apagado (bloquear + suspender) =="
 sudo install -Dm644 "$REPO_DIR/logind/50-noctaliaq-powerkey.conf" /etc/systemd/logind.conf.d/50-noctaliaq-powerkey.conf
 sudo systemctl kill -s HUP systemd-logind
 
+# KYU-TERMINAL-APPS
+echo "== Apps de terminal (cava, cmatrix) =="
+for pkg in cava cmatrix; do
+  pacman -Qi "$pkg" &>/dev/null || sudo pacman -S --needed --noconfirm "$pkg"
+done
+for f in "$REPO_DIR"/config/applications/noctaliaq-*.desktop; do
+  backup_and_copy "$f" "$HOME/.local/share/applications/$(basename "$f")"
+done
+update-desktop-database "$HOME/.local/share/applications" 2>/dev/null
+
 echo "== Scripts .local/bin =="
 mkdir -p "$HOME/.local/bin"
 for f in "$REPO_DIR"/bin/*; do
