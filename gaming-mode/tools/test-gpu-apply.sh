@@ -58,7 +58,7 @@ if [ -f "$MARCA" ]; then
     fi
 
     # pgrep -c ya imprime 0 y sale con 1: el '|| echo 0' duplicaba la salida.
-n=$(pgrep -cx niri 2>/dev/null); n=${n:-0}
+n=$(pgrep -cx 'niri|umbriel' 2>/dev/null); n=${n:-0}
     if [ "$n" = 1 ]; then ok "Un solo niri corriendo."
     else err "Hay $n procesos niri — quedaron huerfanos."; fallos=$((fallos+1)); fi
 
@@ -104,7 +104,7 @@ else
 fi
 
 # pgrep -c ya imprime 0 y sale con 1: el '|| echo 0' duplicaba la salida.
-n=$(pgrep -cx niri 2>/dev/null); n=${n:-0}
+n=$(pgrep -cx 'niri|umbriel' 2>/dev/null); n=${n:-0}
 [ "$n" = 1 ] && ok "Un solo niri ($n)." || { warn "Hay $n procesos niri antes de empezar."; }
 
 echo -e "    ${D}uptime: $(uptime -p 2>/dev/null || echo '?')${N}"

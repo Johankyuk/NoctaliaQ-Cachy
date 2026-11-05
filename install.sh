@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # install.sh — despliegue completo del setup Noctalia/niri de KyuCachy (CachyOS).
 # Uso: clonar el repo y correr ./install.sh desde su raíz.
-set -euo pipefail
+set -Eeuo pipefail
+trap 'echo "ERROR: línea $LINENO: $BASH_COMMAND" >&2' ERR
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 backup_and_copy() {
@@ -34,21 +35,37 @@ echo "== Tema de cursor =="
 pacman -Qi capitaine-cursors >/dev/null 2>&1 || sudo pacman -S --needed capitaine-cursors
 
 echo "== Config Noctalia =="
+if [ -f "$HOME/.config/noctalia/noctalia-full-config.toml" ]; then
+  echo "noctalia-full-config.toml presente: no se despliega config.toml del repo (los hooks van en el overlay zz-noctaliaq.toml)."
+else
 backup_and_copy "$REPO_DIR/config/noctalia/config.toml" "$HOME/.config/noctalia/config.toml"
 # Noctalia no expande ~ ni $HOME en el TOML: las rutas se resuelven aca,
 # sobre la copia desplegada. El archivo del repo queda portable.
 _cfg="$HOME/.config/noctalia/config.toml"
 sed -i "s|\"HOOK\"|\"$HOME/.config/noctalia/scripts/rgb-sync-hook.sh\"|g; s|/home/kyu/|$HOME/|g; s|\"HOME/|\"$HOME/|g" "$_cfg"
-if grep -q 'HOOK\|/home/kyu\|"HOME/' "$_cfg"; then
+# /home/kyu es placeholder solo si $HOME es otro; para el usuario kyu es la ruta real.
+_pat='HOOK\|"HOME/'
+[ "$HOME" = "/home/kyu" ] || _pat="$_pat\|/home/kyu"
+if grep -q "$_pat" "$_cfg"; then
   echo "ERROR: quedaron placeholders sin sustituir en $_cfg" >&2
-  grep -n 'HOOK\|/home/kyu\|"HOME/' "$_cfg" >&2
+  grep -n "$_pat" "$_cfg" >&2
   exit 1
 fi
 echo "config.toml: rutas resueltas para $USER."
+fi
 
 # --- PATH de la sesión gráfica ---------------------------------------------
 # systemd --user no incluye ~/.local/bin; sin esto, miri y cualquier binario
 # propio son invisibles para el launcher.
+# Overlay de hooks GPU/RGB: se carga al final (zz-) y solo pisa lo que declara,
+# asi convive con una config completa propia en ~/.config/noctalia/.
+backup_and_copy "$REPO_DIR/config/noctalia/zz-noctaliaq.toml" "$HOME/.config/noctalia/zz-noctaliaq.toml"
+sed -i "s|\"HOOK\"|\"$HOME/.config/noctalia/scripts/rgb-sync-hook.sh\"|g; s|\"HOME/|\"$HOME/|g" "$HOME/.config/noctalia/zz-noctaliaq.toml"
+if grep -q 'HOOK\|"HOME/' "$HOME/.config/noctalia/zz-noctaliaq.toml"; then
+  echo "ERROR: placeholders sin sustituir en zz-noctaliaq.toml" >&2
+  exit 1
+fi
+
 backup_and_copy "$REPO_DIR/config/environment.d/10-path.conf" "$HOME/.config/environment.d/10-path.conf"
 
 backup_and_copy "$REPO_DIR/config/noctalia/kbd-color-sync.toml" "$HOME/.config/noctalia/kbd-color-sync.toml"
@@ -114,7 +131,7 @@ echo "== Gestor de archivos (nautilus) + iconos Papirus =="
 # .desktop de Nautilus ocultos). Idempotente: no hace nada si nunca se corrió.
 rm -f "$HOME/.local/share/applications/org.gnome.Nautilus.desktop" \
       "$HOME/.local/share/applications/nautilus-autorun-software.desktop"
-update-desktop-database "$HOME/.local/share/applications" 2>/dev/null
+update-desktop-database "$HOME/.local/share/applications" 2>/dev/null || true
 if [ "$(xdg-mime query default inode/directory)" != "org.gnome.Nautilus.desktop" ]; then
   xdg-mime default org.gnome.Nautilus.desktop inode/directory
   if [ "$(xdg-mime query default inode/directory)" != "org.gnome.Nautilus.desktop" ]; then
@@ -208,7 +225,7 @@ systemctl --user enable noctaliaq-gpu-boot.service
 
 # Zen con EGL de Mesa: sin esto su proceso de video abre la NVIDIA y bloquea el apagado.
 backup_and_copy "$REPO_DIR/config/applications/zen.desktop" "$HOME/.local/share/applications/zen.desktop"
-update-desktop-database "$HOME/.local/share/applications" 2>/dev/null
+update-desktop-database "$HOME/.local/share/applications" 2>/dev/null || true
 
 # Apagado fisico de la dGPU (solo laptops ASUS con dgpu_disable). Requiere root.
 if [[ -e /sys/devices/platform/asus-nb-wmi/dgpu_disable ]]; then
@@ -229,6 +246,23 @@ sudo cp "$REPO_DIR/keyd/default.conf" /etc/keyd/default.conf
 sudo cmp -s "$REPO_DIR/keyd/default.conf" /etc/keyd/default.conf || { echo "ERROR: /etc/keyd/default.conf no coincide con el repo"; exit 1; }
 sudo systemctl enable --now keyd
 sudo keyd reload
+
+echo "== Umbriel (compositor adicional a niri) =="
+command -v paru >/dev/null 2>&1 || sudo pacman -S --needed --noconfirm paru
+for pkg in umbriel-git xdg-desktop-portal-umbriel-git; do
+  if pacman -Qi "$pkg" &>/dev/null; then
+    echo "$pkg ya instalado, se omite."
+  else
+    paru -S --needed --noconfirm --skipreview "$pkg"
+  fi
+done
+backup_and_copy "$REPO_DIR/config/umbriel/config.toml" "$HOME/.config/umbriel/config.toml"
+if [[ -e /sys/devices/platform/asus-nb-wmi/dgpu_disable ]]; then
+  backup_and_copy "$REPO_DIR/config/umbriel/drm-asus.toml" "$HOME/.config/umbriel/drm.toml"
+else
+  rm -f "$HOME/.config/umbriel/drm.toml"
+fi
+umbriel config validate
 
 echo "== Scripts .local/bin =="
 mkdir -p "$HOME/.local/bin"

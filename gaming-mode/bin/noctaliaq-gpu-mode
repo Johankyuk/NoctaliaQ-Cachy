@@ -333,7 +333,7 @@ _terminar_sesiones(){
     loginctl terminate-seat seat0 2>/dev/null
     sleep 2
     # Red final: cualquier niri que siga en pie tras terminar el asiento.
-    for leader in $(pgrep -x niri 2>/dev/null); do
+    for leader in $(pgrep -x 'niri|umbriel' 2>/dev/null); do
         jlog "niri $leader sigue vivo tras terminate-seat; SIGTERM"
         kill -TERM "$leader" 2>/dev/null
     done

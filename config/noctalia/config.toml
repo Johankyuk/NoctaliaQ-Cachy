@@ -476,6 +476,7 @@ input_borders = true
 launch_apps_as_systemd_services = false
 launch_apps_custom_command = "HOME/.local/bin/noctaliaq-gpu-launch $CMD"
 niri_overview_type_to_launch_enabled = true
+umbriel_overview_type_to_launch_enabled = true
 offline_mode = false
 password_style = "random"
 polkit_agent = true
@@ -676,7 +677,7 @@ source = "wallpaper"
 wallpaper_scheme = "dysfunctional"
 
     [theme.templates]
-    builtin_ids = [ "btop", "cava", "foot", "gtk3", "gtk4", "kcolorscheme", "niri", "qt" ]
+    builtin_ids = [ "btop", "cava", "foot", "gtk3", "gtk4", "kcolorscheme", "niri", "qt", "umbriel" ]
     community_ids = [ "ytm-player", "zen-browser", "discord", "gimp", "libreoffice", "vscode", "heroiclauncher", "steam", "fastfetch", "obs", "fcitx5", "papirus-icons", "snappy-switcher", "whitesur-icons" ]
     enable_builtin_templates = true
     enable_community_templates = true

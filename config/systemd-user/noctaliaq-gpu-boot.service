@@ -1,9 +1,9 @@
 [Unit]
 Description=NoctaliaQ: dGPU en ahorro al iniciar sesion
-PartOf=niri.service
-After=niri.service
+PartOf=niri.service umbriel.service
+After=niri.service umbriel.service
 [Service]
 Type=oneshot
 ExecStart=%h/.local/bin/noctaliaq-gpu-prime boot
 [Install]
-WantedBy=niri.service
+WantedBy=niri.service umbriel.service
