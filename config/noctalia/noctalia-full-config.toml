@@ -68,7 +68,7 @@ order = [ "default" ]
     shadow = false
     show_on_workspace_switch = true
     smart_auto_hide = false
-    start = [ "spacer_1", "workspaces", "spacer_1", "weather", "spacer_1", "sysmon", "spacer_1", "media" ]
+    start = [ "spacer_1", "workspaces", "spacer_1", "weather", "spacer_1", "sysmon", "spacer_1", "media", "spacer_1", "audio_vis" ]
     thickness = 33
     widget_spacing = 6
 
@@ -785,6 +785,14 @@ type = "kv7499/asus-fan:asus_fan"
 
 [widget.asus_fan_2]
 type = "kv7499/asus-fan:asus_fan"
+
+[widget.audio_vis]
+bands = 20
+high_color = "secondary"
+low_color = "primary"
+show_when_idle = true
+type = "audio_visualizer"
+width = 64
 
 [widget.clock]
 anchor = true
