@@ -1,11 +1,20 @@
 # NoctaliaQ-Cachy
 
-Setup completo de Noctalia v5 + Umbriel en CachyOS (KyuCachy). Config, scripts de GPU PRIME,
-overrides de MangoHud para flatpaks.
+Setup personal de Noctalia v5 sobre Umbriel en CachyOS, para un portátil ASUS TUF con GPU NVIDIA.
+Es sobre todo un recordatorio de cómo quedó el sistema, organizado por módulos para poder
+revisar cada parte por separado.
 
-## Instalación rápida (cualquier máquina, sin llave SSH)
+## Requisitos
 
-El repo es público — clonar por HTTPS no requiere configurar nada:
+- CachyOS con niri ya instalado. niri solo sirve de base: Umbriel todavía no es opción en el
+  instalador de CachyOS.
+- Portátil ASUS con dGPU NVIDIA. `install.sh` solo cubre este equipo.
+
+No hace falta nada más: `install.sh` instala el resto.
+
+## Instalación
+
+El repo es público, clonar por HTTPS no requiere configurar nada:
 
 ```bash
 git clone https://github.com/Johankyuk/NoctaliaQ-Cachy.git ~/NoctaliaQ-Cachy && \
@@ -13,76 +22,46 @@ cd ~/NoctaliaQ-Cachy && \
 ./install.sh
 ```
 
-`install.sh` es idempotente: si algo ya está instalado o configurado, lo detecta y lo omite.
-Todo archivo que reemplaza se respalda como `archivo.bak.<timestamp>` antes de sobreescribirse.
+`install.sh` es idempotente: lo que ya está instalado o configurado se omite. Todo archivo que
+reemplaza se respalda como `archivo.bak.<timestamp>`. Al terminar, cierra sesión y elige Umbriel
+en SDDM.
 
-> Si vas a contribuir cambios de vuelta al repo (no solo desplegar config), necesitás el
-> remote por SSH y una llave agregada en https://github.com/settings/ssh/new — para solo
-> instalar en una máquina, HTTPS basta.
+El detalle de cada sección (placeholders de rutas, completions, keyd, etc.) está en
+[docs/instalacion-detalle.md](docs/instalacion-detalle.md).
 
-## Qué instala `install.sh`
+## Mapa del repo
 
-- **Cursor**: paquete `capitaine-cursors`. El tema y el tamaño los gobierna
-  `config/niri/cfg/cursor.kdl` (fuente única). El tema activo es
-  `Skyrim-by-ru5tyshark-cursors`, instalación manual desde el repo `cursor-manager`.
-- **Noctalia**: `config.toml` completo (bar, dock, hooks, tema) + `kbd-color-sync.toml`
-  (sat=1.6 val=0.85).
-- **MangoHud**: paquete + `MangoHud.conf` + overrides para Sober y mcpelauncher si están
-  instalados (Vulkan layer vía Flatpak).
-- **Nautilus + papirus-icon-theme**: gestor de archivos e iconos; el recoloreo lo hace la plantilla `papirus-icons` de Noctalia.
-- **niri**: todos los `.kdl` de `config/niri/cfg/` + `config.kdl` (window-rules, blur).
-- **Zsh**: paquete + `cachyos-zsh-config` + zoxide + eza + `.zshrc`/`.p10k.zsh`, y cambia la
-  shell por defecto del usuario (`chsh`, pide password del usuario).
-- **Completions de noctalia**: `noctalia completions zsh` →
-  `~/.local/share/zsh/site-functions/_noctalia`. Se generan del esquema vivo, así que
-  **incluyen los subcomandos de los plugins instalados en ese momento** — regenerar con
-  el mismo comando tras instalar o quitar plugins. El `zshrc` agrega ese directorio a
-  `fpath` antes de `cachyos-config.zsh`, que es quien corre `compinit`; si se mueve esa
-  línea después, las completions dejan de cargar en silencio.
-- **Foot**: paquete + config + tema dinámico Noctalia.
-- **Zen Browser**: paquete `zen-browser-bin` (repo `cachyos`, sin AUR).
-  `F13`, que XKB entrega como `XF86Tools` — ese es el bind del control center en niri.
-  El hold sigue siendo Super normal; el umbral de `overloadt2` (250 ms) aplica igual al
-  tap y al arrastre de flotantes con Super+click.
-- **Umbriel** (compositor principal): `umbriel-git` + `xdg-desktop-portal-umbriel-git` desde AUR con paru; `config/umbriel/config.toml` → `~/.config/umbriel/` (portado de `config/niri/cfg`; layout dwindle por defecto, `Mod+M` alterna master/scrolling) y `drm.toml` solo en ASUS con `dgpu_disable` (excluye la dGPU, equivalente al `ignore-drm-device` de niri). Es el entorno principal: el instalador ofrece eliminar otros entornos instalados (pide confirmacion).
-- **Scripts** de `bin/` → `~/.local/bin/` (kbd-color-sync, mangohud-color-sync,
-  noctaliaq-gpu-prime, noctaliaq-gpu-launch, noctaliaq-gpu-flatpak-sync).
-
-## Placeholders de rutas
-
-Los archivos de `config/` no llevan rutas absolutas: `install.sh` las sustituye al
-desplegar, para que el repo funcione con cualquier usuario. Tres formas, cada una con
-su `sed` y su guardia que aborta si algo queda sin sustituir:
-
-| Placeholder | Archivos | Se reemplaza por |
+| Ruta | Qué es | Estado |
 |---|---|---|
-| `"HOME/` | `noctalia/config.toml`, `noctalia/kbd-color-sync.toml` | `"$HOME/` |
-| `=HOME/` | `MangoHud/MangoHud.conf` | `=$HOME/` |
-| `"HOOK"` | `noctalia/config.toml` | ruta a `rgb-sync-hook.sh` |
+| [`install.sh`](install.sh) | Instalador principal, por secciones | Vigente |
+| [`config/`](config/README.md) | Dotfiles: Noctalia, Umbriel, foot, zsh, MangoHud, launcher | Vigente (`config/niri` es legado) |
+| [`bin/`](bin/README.md) | Scripts que se despliegan a `~/.local/bin` | Vigente |
+| [`gpu-setup/`](gpu-setup/README.md) | Control físico de la dGPU ASUS (la llama `install.sh`) | Vigente |
+| [`gaming-mode/`](gaming-mode/README.md) | Modo juego: perfiles de energía, dGPU y PRIME | Opcional, con wizard propio |
+| `logind/` | Botón de apagado: pulsación corta bloquea y suspende, larga apaga | Vigente |
+| `assets/` | Imagen de perfil y wallpaper | Vigente |
+| [`greeter-setup/`](greeter-setup/README.md) | SDDM a greetd + noctalia-greeter | Manual, sin uso hoy |
+| [`alienware-setup/`](alienware-setup/README.md) | RGB para un Alienware | Sin soporte |
+| [`handoffs/`](handoffs/README.md) | Notas de sesiones de trabajo | Historial |
 
-**Al editar estos archivos, nunca commitear rutas absolutas.** El `sed` de `config.toml`
-tiene además una red de seguridad (`s|/home/kyu/|$HOME/|g`) que los otros dos no tienen.
+## Qué hace install.sh
 
-Consecuencia para diagnóstico: un `diff` crudo entre `config/noctalia/config.toml` y
-`~/.config/noctalia/config.toml` siempre muestra estas líneas y no indica drift. Para
-comparar de verdad hay que normalizar primero con el mismo `sed` que aplica `install.sh`.
+En este orden: RGB (Alienware), tema de cursor, config de Noctalia, MangoHud (paquete y config),
+MangoHud en flatpaks, PRIME offload en flatpaks, Nautilus con iconos Papirus, niri cfg, zsh
+(paquetes, config y p10k), completions de zsh para noctalia, foot, niri config.kdl, Zen Browser,
+Umbriel (compositor principal), Umbriel como entorno principal, botón de apagado, apps de
+terminal (cava, cmatrix, playerctl) y scripts a `~/.local/bin`.
 
-Si se agrega un archivo nuevo con rutas, agregar las tres piezas: placeholder en el
-archivo, `sed` en `install.sh`, y `grep` que aborte.
+## Stack actual
 
-## Módulos manuales (no los corre `install.sh`)
+- Sesión: Umbriel, con SDDM como display manager.
+- Shell: Noctalia v5. La barra incluye visualizador de audio y el plugin lyrics.
+- Terminal foot, archivos Nautilus con Papirus, navegador Zen, cursor `capitaine-cursors`.
+- Gráficos: PRIME offload; el modo juego enciende la dGPU y PRIME para apps nativas y flatpaks.
+- Apps de terminal en el launcher: cava, cmatrix y lavat.
 
-Estos requieren pasos que no son seguros de automatizar de un tirón (compilar de AUR,
-tocar el display manager del sistema, o dependen de contexto que varía por máquina):
+## Notas y pendientes
 
-- **`greeter-setup/`** — reemplaza SDDM por greetd + noctalia-greeter. Requiere compilar
-  `noctalia-greeter` de AUR primero. Ver `greeter-setup/README.md` para el procedimiento
-  y el rollback si falla.
-
-## Estructura
-config/ — dotfiles: noctalia, niri, umbriel, foot, zsh, MangoHud
-bin/ — scripts desplegados a ~/.local/bin
-greeter-setup/ — módulo manual: SDDM → greetd
-handoffs/ — notas de sesiones de trabajo, no se despliegan
-
-- **Imagenes**: `assets/Kyu_PFP.png` y `assets/wallpapers/Kyu_Wallpaper.png` se instalan en `~/.local/share/noctaliaq/` (nunca en `~/Pictures`); `noctalia-full-config.toml` apunta ahi.
+- Falta agregar el greeter de Noctalia. Hoy se usa SDDM; `greeter-setup/` es manual y no está en uso.
+- `config/niri` es legado: niri solo es la base de CachyOS.
+- Lo de Alienware fue una adaptación para un compañero y no tiene soporte.
