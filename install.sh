@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# install.sh — despliegue completo del setup Noctalia/niri de KyuCachy (CachyOS).
+# install.sh — despliegue completo del setup Noctalia/Umbriel de KyuCachy (CachyOS).
 # Uso: clonar el repo y correr ./install.sh desde su raíz.
 set -Eeuo pipefail
 trap 'echo "ERROR: línea $LINENO: $BASH_COMMAND" >&2' ERR
@@ -56,6 +56,10 @@ fi
 
 # KYU-PALETTE-INSTALL
 # Paleta Kyu_Pallete y config completa de Noctalia (rutas /home/kyu resueltas a $HOME).
+# KYU-ASSETS
+# Imagenes propias en ~/.local/share/noctaliaq (no se toca ~/Pictures).
+install -Dm644 "$REPO_DIR/assets/Kyu_PFP.png" "$HOME/.local/share/noctaliaq/Kyu_PFP.png"
+install -Dm644 "$REPO_DIR/assets/wallpapers/Kyu_Wallpaper.png" "$HOME/.local/share/noctaliaq/wallpapers/Kyu_Wallpaper.png"
 mkdir -p "$HOME/.config/noctalia/palettes"
 backup_and_copy "$REPO_DIR/config/noctalia/palettes" "$HOME/.config/noctalia/palettes"
 backup_and_copy "$REPO_DIR/config/noctalia/noctalia-full-config.toml" "$HOME/.config/noctalia/noctalia-full-config.toml"
@@ -157,10 +161,13 @@ for pkg in nautilus papirus-icon-theme; do
   fi
 done
 
+# KYU-NIRI-OPCIONAL
+if command -v niri >/dev/null 2>&1; then
 echo "== niri cfg =="
 for f in "$REPO_DIR"/config/niri/cfg/*.kdl; do
   backup_and_copy "$f" "$HOME/.config/niri/cfg/$(basename "$f")"
 done
+fi
 
 echo "== Zsh (paquetes + config + p10k) =="
 if ! pacman -Qi zsh &>/dev/null; then
@@ -208,8 +215,11 @@ else
 fi
 backup_and_copy "$REPO_DIR/config/foot" "$HOME/.config/foot"
 
+# KYU-NIRI-OPCIONAL-2
+if command -v niri >/dev/null 2>&1; then
 echo "== niri config.kdl (window-rules, blur) =="
 backup_and_copy "$REPO_DIR/config/niri/config.kdl" "$HOME/.config/niri/config.kdl"
+fi
 
 echo "== Zen Browser =="
 if ! pacman -Qi zen-browser-bin &>/dev/null; then
@@ -236,7 +246,7 @@ if [[ -e /sys/devices/platform/asus-nb-wmi/dgpu_disable ]]; then
 fi
 
 
-echo "== Umbriel (compositor adicional a niri) =="
+echo "== Umbriel (compositor principal) =="
 command -v paru >/dev/null 2>&1 || sudo pacman -S --needed --noconfirm paru
 for pkg in umbriel-git xdg-desktop-portal-umbriel-git; do
   if pacman -Qi "$pkg" &>/dev/null; then
@@ -253,6 +263,27 @@ else
 fi
 umbriel config validate
 
+# KYU-PRINCIPAL-UMBRIEL
+echo "== Umbriel como entorno principal =="
+_otros=()
+for _pkg in niri hyprland sway river labwc plasma-desktop plasma-workspace gnome-shell gnome-session xfce4-session cosmic-session cinnamon budgie-desktop mate-session-manager lxqt-session i3-wm bspwm awesome openbox qtile; do
+  pacman -Qq "$_pkg" >/dev/null 2>&1 && _otros+=("$_pkg")
+done
+if [ "${#_otros[@]}" -gt 0 ]; then
+  echo "Otros entornos o compositores instalados: ${_otros[*]}"
+  if [ -r /dev/tty ]; then
+    read -r -p "Eliminarlos y dejar Umbriel como principal? [s/N] " _resp </dev/tty
+  else
+    _resp=n
+  fi
+  case "$_resp" in
+    s|S|y|Y) sudo pacman -Rns "${_otros[@]}" </dev/tty ;;
+    *) echo "Se conservan." ;;
+  esac
+else
+  echo "No hay otros entornos instalados."
+fi
+
 echo "== Scripts .local/bin =="
 mkdir -p "$HOME/.local/bin"
 for f in "$REPO_DIR"/bin/*; do
@@ -260,4 +291,4 @@ for f in "$REPO_DIR"/bin/*; do
   chmod +x "$HOME/.local/bin/$(basename "$f")"
 done
 
-echo "✓ terminado — reiniciá niri o hacé logout/login para que todo tome efecto"
+echo "✓ terminado — hacé logout/login y elegí Umbriel para que todo tome efecto"

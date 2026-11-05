@@ -1,6 +1,6 @@
 # NoctaliaQ-Cachy
 
-Setup completo de Noctalia v5 + niri en CachyOS (KyuCachy). Config, scripts de GPU PRIME,
+Setup completo de Noctalia v5 + Umbriel en CachyOS (KyuCachy). Config, scripts de GPU PRIME,
 overrides de MangoHud para flatpaks.
 
 ## Instalación rápida (cualquier máquina, sin llave SSH)
@@ -44,7 +44,7 @@ Todo archivo que reemplaza se respalda como `archivo.bak.<timestamp>` antes de s
   `F13`, que XKB entrega como `XF86Tools` — ese es el bind del control center en niri.
   El hold sigue siendo Super normal; el umbral de `overloadt2` (250 ms) aplica igual al
   tap y al arrastre de flotantes con Super+click.
-- **Umbriel** (compositor adicional a niri): `umbriel-git` + `xdg-desktop-portal-umbriel-git` desde AUR con paru; `config/umbriel/config.toml` → `~/.config/umbriel/` (portado de `config/niri/cfg`; layout dwindle por defecto, `Mod+M` alterna master/scrolling) y `drm.toml` solo en ASUS con `dgpu_disable` (excluye la dGPU, equivalente al `ignore-drm-device` de niri). Se elige en el display manager; niri sigue disponible.
+- **Umbriel** (compositor principal): `umbriel-git` + `xdg-desktop-portal-umbriel-git` desde AUR con paru; `config/umbriel/config.toml` → `~/.config/umbriel/` (portado de `config/niri/cfg`; layout dwindle por defecto, `Mod+M` alterna master/scrolling) y `drm.toml` solo en ASUS con `dgpu_disable` (excluye la dGPU, equivalente al `ignore-drm-device` de niri). Es el entorno principal: el instalador ofrece eliminar otros entornos instalados (pide confirmacion).
 - **Scripts** de `bin/` → `~/.local/bin/` (kbd-color-sync, mangohud-color-sync,
   noctaliaq-gpu-prime, noctaliaq-gpu-launch, noctaliaq-gpu-flatpak-sync).
 
@@ -84,3 +84,5 @@ config/ — dotfiles: noctalia, niri, umbriel, foot, zsh, MangoHud
 bin/ — scripts desplegados a ~/.local/bin
 greeter-setup/ — módulo manual: SDDM → greetd
 handoffs/ — notas de sesiones de trabajo, no se despliegan
+
+- **Imagenes**: `assets/Kyu_PFP.png` y `assets/wallpapers/Kyu_Wallpaper.png` se instalan en `~/.local/share/noctaliaq/` (nunca en `~/Pictures`); `noctalia-full-config.toml` apunta ahi.

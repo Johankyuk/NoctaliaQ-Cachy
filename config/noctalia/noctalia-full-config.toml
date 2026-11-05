@@ -507,7 +507,7 @@ enabled = [ "noctalia/screen_recorder", "kv7499/asus-fan" ]
 
 [shell]
 app_icon_colorize = false
-avatar_path = "/home/kyu/Pictures/Wallpapers/Kyu_PFP.png"
+avatar_path = "/home/kyu/.local/share/noctaliaq/Kyu_PFP.png"
 button_borders = true
 card_borders = true
 clipboard_auto_paste = "auto"
@@ -749,7 +749,7 @@ wallpaper_scheme = "dysfunctional"
     enable_community_templates = true
 
 [wallpaper]
-directory = "/home/kyu/Pictures/Wallpapers"
+directory = "/home/kyu/.local/share/noctaliaq/wallpapers"
 directory_dark = ""
 directory_light = ""
 edge_smoothness = 0.30000001192092896
