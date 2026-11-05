@@ -284,6 +284,11 @@ else
   echo "No hay otros entornos instalados."
 fi
 
+# KYU-POWERKEY
+echo "== Boton de apagado (bloquear + suspender) =="
+sudo install -Dm644 "$REPO_DIR/logind/50-noctaliaq-powerkey.conf" /etc/systemd/logind.conf.d/50-noctaliaq-powerkey.conf
+sudo systemctl kill -s HUP systemd-logind
+
 echo "== Scripts .local/bin =="
 mkdir -p "$HOME/.local/bin"
 for f in "$REPO_DIR"/bin/*; do
