@@ -1,0 +1,346 @@
+"""umbriel-keybinds: editor TUI de la seccion [keybinds] de la config de Umbriel."""
+import curses, os, re, shutil, subprocess, sys, time
+
+CFG = os.path.expanduser(os.environ.get("UMBRIEL_CONFIG", "~/.config/umbriel/config.toml"))
+REPO_CFG = os.path.expanduser(os.environ.get("UMBRIEL_REPO_CONFIG", "~/NoctaliaQ-Cachy/config/umbriel/config.toml"))
+
+ENTRY = re.compile(r'^\s*"((?:[^"\\]|\\.)+)"\s*=\s*(.*?)\s*$')
+ACT = re.compile(r'^  ([a-z][a-z0-9-]*)((?: (?:<[^>]*>|\[[^\]]*\]))*)\s{2,}(.*)$')
+
+
+def esc(s):
+    return s.replace("\\", "\\\\").replace('"', '\\"')
+
+
+def unesc(s):
+    return re.sub(r"\\(.)", r"\1", s)
+
+
+def parse_value(v):
+    v = v.strip()
+    if v.startswith("{"):
+        m = re.search(r'action\s*=\s*"((?:[^"\\]|\\.)*)"', v)
+        action = unesc(m.group(1)) if m else ""
+        rest = re.sub(r'action\s*=\s*"(?:[^"\\]|\\.)*"\s*,?\s*', "", v[1:-1].strip() if v.endswith("}") else v[1:])
+        return action, rest.strip().strip(",").strip()
+    m = re.match(r'^"((?:[^"\\]|\\.)*)"$', v)
+    return (unesc(m.group(1)) if m else v), ""
+
+
+def build_value(action, extras):
+    a = '"%s"' % esc(action)
+    return "{ action = %s, %s }" % (a, extras) if extras else a
+
+
+class Doc:
+    def __init__(self, path):
+        self.path = path
+        self.lines = open(path, encoding="utf-8").read().split("\n")
+        self.dirty = False
+
+    def section(self):
+        start = None
+        for i, l in enumerate(self.lines):
+            if l.strip() == "[keybinds]":
+                start = i
+                break
+        if start is None:
+            self.lines += ["", "[keybinds]"]
+            start = len(self.lines) - 1
+        end = len(self.lines)
+        for i in range(start + 1, len(self.lines)):
+            if self.lines[i].lstrip().startswith("["):
+                end = i
+                break
+        return start, end
+
+    def binds(self):
+        s, e = self.section()
+        out = []
+        for i in range(s + 1, e):
+            m = ENTRY.match(self.lines[i])
+            if m:
+                a, x = parse_value(m.group(2))
+                out.append({"i": i, "key": unesc(m.group(1)), "action": a, "extras": x})
+        return out
+
+    def set(self, i, key, action, extras):
+        self.lines[i] = '"%s" = %s' % (esc(key), build_value(action, extras))
+        self.dirty = True
+
+    def add(self, key, action, extras=""):
+        s, e = self.section()
+        last = s
+        for i in range(s + 1, e):
+            if ENTRY.match(self.lines[i]):
+                last = i
+        self.lines.insert(last + 1, '"%s" = %s' % (esc(key), build_value(action, extras)))
+        self.dirty = True
+
+    def delete(self, i):
+        del self.lines[i]
+        self.dirty = True
+
+    def text(self):
+        return "\n".join(self.lines)
+
+
+def run(cmd):
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=20)
+        return r.returncode, (r.stdout or "") + (r.stderr or "")
+    except Exception as ex:
+        return 1, str(ex)
+
+
+def parse_help(cmd):
+    rc, out = run(cmd)
+    res = []
+    for l in out.splitlines():
+        m = ACT.match(l)
+        if m:
+            res.append((m.group(1), m.group(2).strip(), m.group(3).strip()))
+    return res
+
+
+def save(doc):
+    bak = "%s.bak.%d" % (CFG, int(time.time()))
+    shutil.copy2(CFG, bak)
+    with open(CFG, "w", encoding="utf-8") as f:
+        f.write(doc.text())
+    rc, out = run(["umbriel", "config", "validate"])
+    if rc:
+        shutil.copy2(bak, CFG)
+        last = out.strip().splitlines()[-1][:200] if out.strip() else ""
+        return False, "invalida, restaurado: " + last
+    doc.dirty = False
+    msg = "guardado y validado"
+    try:
+        if os.path.isdir(os.path.dirname(REPO_CFG)) and not (os.path.realpath(REPO_CFG) == os.path.realpath(CFG)):
+            shutil.copy2(CFG, REPO_CFG)
+            msg += " (copiado al repo, falta commit)"
+    except Exception:
+        pass
+    return True, msg
+
+
+# ---------------- TUI ----------------
+
+def text_prompt(scr, title, initial=""):
+    buf = list(initial)
+    curses.curs_set(1)
+    while True:
+        h, w = scr.getmaxyx()
+        scr.move(h - 2, 0)
+        scr.clrtoeol()
+        scr.addnstr(h - 2, 0, title, w - 1, curses.A_BOLD)
+        scr.move(h - 1, 0)
+        scr.clrtoeol()
+        s = "".join(buf)
+        scr.addnstr(h - 1, 0, "> " + s[-(w - 4):], w - 1)
+        scr.refresh()
+        ch = scr.get_wch()
+        if ch in ("\n", "\r") or ch == curses.KEY_ENTER:
+            curses.curs_set(0)
+            return "".join(buf)
+        if ch == "\x1b":
+            curses.curs_set(0)
+            return None
+        if ch in ("\x7f", "\b") or ch == curses.KEY_BACKSPACE:
+            if buf:
+                buf.pop()
+        elif ch == "\x15":
+            buf = []
+        elif isinstance(ch, str) and ch.isprintable():
+            buf.append(ch)
+
+
+def picker(scr, title, items):
+    """items: lista de (label, valor). Devuelve valor o None."""
+    flt, sel, top = "", 0, 0
+    while True:
+        view = [it for it in items if flt.lower() in it[0].lower()]
+        sel = max(0, min(sel, len(view) - 1))
+        h, w = scr.getmaxyx()
+        scr.erase()
+        scr.addnstr(0, 0, title + "   (escribe para filtrar, Enter elige, Esc cancela)", w - 1, curses.A_BOLD)
+        scr.addnstr(1, 0, "filtro: " + flt, w - 1)
+        rows = h - 3
+        if sel < top:
+            top = sel
+        if sel >= top + rows:
+            top = sel - rows + 1
+        for r in range(rows):
+            k = top + r
+            if k >= len(view):
+                break
+            scr.addnstr(2 + r, 0, view[k][0], w - 1, curses.A_REVERSE if k == sel else 0)
+        scr.refresh()
+        ch = scr.get_wch()
+        if ch in ("\n", "\r") or ch == curses.KEY_ENTER:
+            return view[sel][1] if view else None
+        if ch == "\x1b":
+            return None
+        if ch == curses.KEY_UP:
+            sel -= 1
+        elif ch == curses.KEY_DOWN:
+            sel += 1
+        elif ch == curses.KEY_PPAGE:
+            sel -= rows
+        elif ch == curses.KEY_NPAGE:
+            sel += rows
+        elif ch in ("\x7f", "\b") or ch == curses.KEY_BACKSPACE:
+            flt = flt[:-1]
+        elif isinstance(ch, str) and ch.isprintable():
+            flt += ch
+            sel = 0
+
+
+def choose_action(scr, current, uacts, nacts):
+    items = [("spawn  - ejecutar un comando de shell", ("spawn", "")),
+             ("(texto libre)  - escribir la accion completa", ("free", ""))]
+    for n, a, d in uacts:
+        if n == "spawn":
+            continue
+        items.append(("%s %s  -  %s" % (n, a, d), ("u", n, a)))
+    for n, a, d in nacts:
+        items.append(("noctalia: %s %s  -  %s" % (n, a, d), ("n", n, a)))
+    r = picker(scr, "Accion", items)
+    if r is None:
+        return None
+    if r[0] == "free":
+        return text_prompt(scr, "Accion completa:", current)
+    if r[0] == "spawn":
+        init = current[6:] if current.startswith("spawn ") else ""
+        c = text_prompt(scr, "Comando para spawn:", init)
+        return None if c is None else "spawn " + c
+    if r[0] == "u":
+        pre = ""
+        if current.split(" ")[0] == r[1]:
+            pre = current[len(r[1]):].strip()
+        if r[2]:
+            c = text_prompt(scr, "Argumentos %s:" % r[2], pre)
+            if c is None:
+                return None
+            return (r[1] + " " + c).strip()
+        return r[1]
+    pre = ""
+    pfx = "spawn noctalia msg " + r[1]
+    if current.startswith(pfx):
+        pre = current[len(pfx):].strip()
+    if r[2]:
+        c = text_prompt(scr, "Argumentos %s:" % r[2], pre)
+        if c is None:
+            return None
+        return (pfx + " " + c).strip()
+    return pfx
+
+
+KEYRE = re.compile(r"^\S+$")
+
+
+def ask_key(scr, initial=""):
+    k = text_prompt(scr, "Tecla (ej. Mod+Shift+Return, Print, XF86Tools):", initial)
+    if k is None:
+        return None
+    k = k.strip()
+    return k if KEYRE.match(k) else None
+
+
+def main_tui(scr, doc):
+    curses.curs_set(0)
+    uacts = parse_help(["umbriel", "msg", "--help"])
+    nacts = parse_help(["noctalia", "msg", "--help"])
+    sel, top, flt, status = 0, 0, "", "a:agregar  e:editar accion  r:cambiar tecla  d:borrar  /:filtrar  s:guardar  q:salir"
+    while True:
+        binds = doc.binds()
+        view = [b for b in binds if flt.lower() in (b["key"] + " " + b["action"]).lower()]
+        sel = max(0, min(sel, len(view) - 1))
+        h, w = scr.getmaxyx()
+        scr.erase()
+        head = "Umbriel keybinds  [%d]%s%s" % (len(binds), "  *sin guardar*" if doc.dirty else "", ("  filtro=" + flt) if flt else "")
+        scr.addnstr(0, 0, head, w - 1, curses.A_BOLD)
+        rows = h - 3
+        if sel < top:
+            top = sel
+        if sel >= top + rows:
+            top = sel - rows + 1
+        kw = min(28, max([len(b["key"]) for b in view] + [8]))
+        for r in range(rows):
+            k = top + r
+            if k >= len(view):
+                break
+            b = view[k]
+            line = "%-*s  %s%s" % (kw, b["key"], b["action"], ("   {" + b["extras"] + "}") if b["extras"] else "")
+            scr.addnstr(1 + r, 0, line, w - 1, curses.A_REVERSE if k == sel else 0)
+        scr.addnstr(h - 1, 0, status, w - 1)
+        scr.refresh()
+        ch = scr.get_wch()
+        cur = view[sel] if view else None
+        if ch in (curses.KEY_UP, "k"):
+            sel -= 1
+        elif ch in (curses.KEY_DOWN, "j"):
+            sel += 1
+        elif ch == curses.KEY_PPAGE:
+            sel -= rows
+        elif ch == curses.KEY_NPAGE:
+            sel += rows
+        elif ch in ("e", "\n", "\r") and cur:
+            a = choose_action(scr, cur["action"], uacts, nacts)
+            if a:
+                doc.set(cur["i"], cur["key"], a, cur["extras"])
+                status = "accion cambiada"
+        elif ch == "r" and cur:
+            k = ask_key(scr, cur["key"])
+            if k and any(b["key"] == k and not (b["i"] == cur["i"]) for b in binds):
+                status = "ya existe " + k
+            elif k:
+                doc.set(cur["i"], k, cur["action"], cur["extras"])
+                status = "tecla cambiada"
+        elif ch == "a":
+            k = ask_key(scr)
+            if not k:
+                status = "tecla invalida"
+            elif any(b["key"] == k for b in binds):
+                status = "ya existe " + k
+            else:
+                a = choose_action(scr, "", uacts, nacts)
+                if a:
+                    doc.add(k, a)
+                    status = "agregado " + k
+        elif ch == "d" and cur:
+            c = text_prompt(scr, "Borrar %s ? (y para confirmar)" % cur["key"])
+            if c and c.strip().lower() == "y":
+                doc.delete(cur["i"])
+                status = "borrado"
+        elif ch == "/":
+            f = text_prompt(scr, "Filtro (vacio = todos):", flt)
+            if f is not None:
+                flt = f
+                sel = 0
+        elif ch == "s":
+            ok, msg = save(doc)
+            status = msg
+        elif ch in ("q", "\x1b"):
+            if doc.dirty:
+                c = text_prompt(scr, "Hay cambios sin guardar. Salir sin guardar? (y)")
+                if not (c and c.strip().lower() == "y"):
+                    continue
+            return
+
+
+def main():
+    if not os.path.isfile(CFG):
+        print("no existe", CFG)
+        return 1
+    doc = Doc(CFG)
+    if "--list" in sys.argv:
+        for b in doc.binds():
+            print("%-28s %s %s" % (b["key"], b["action"], b["extras"]))
+        return 0
+    curses.wrapper(main_tui, doc)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
