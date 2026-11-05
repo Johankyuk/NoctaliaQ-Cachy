@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Lavat
+Comment=Lampara de lava en terminal
+Exec=foot --app-id=noctaliaq-lavat --title=Lavat lavat -c magenta -k cyan -R 1 -s 4
+Icon=utilities-terminal
+Categories=System;Utility;
+Keywords=lavat;lava;lampara;
