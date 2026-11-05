@@ -20,10 +20,10 @@ order = [ "default", "Bar_side" ]
     [bar.Bar_side]
     auto_hide = true
     background_opacity = 1.0
-    border = "outline"
+    border = "outline_variant"
     border_width = 0.0
     capsule = true
-    capsule_fill = "surface_variant"
+    capsule_fill = "surface_container"
     capsule_group = []
     capsule_opacity = 1.0
     capsule_padding = 6.0
@@ -61,7 +61,7 @@ order = [ "default", "Bar_side" ]
     [bar.default]
     auto_hide = false
     background_opacity = 0.75999999046325684
-    border = "outline"
+    border = "outline_variant"
     border_width = 0.0
     capsule = true
     capsule_fill = "primary"
@@ -159,7 +159,7 @@ active_opacity = 1.0
 active_scale = 0.65000003576278687
 auto_hide = false
 background_opacity = 0.66999995708465576
-border = "outline"
+border = "outline_variant"
 border_width = 0.0
 concave_edge_corners = true
 cross_axis_padding = 8
@@ -178,7 +178,6 @@ magnification_scale = 2.0
 main_axis_padding = 16
 margin_edge = 0
 margin_ends = 0
-monitors = []
 pinned = [ "foot", "code-oss", "nvtop", "btop", "zen", "discord", "org.vinegarhq.Sober" ]
 position = "bottom"
 radius = 80
@@ -194,10 +193,10 @@ show_running = true
 smart_auto_hide = true
 
 [hooks]
-battery_charging = [ "HOME/.local/bin/noctaliaq-gpu-prime on" ]
-battery_discharging = [ "HOME/.local/bin/noctaliaq-gpu-prime off" ]
+battery_charging = []
+battery_discharging = []
 battery_percentage_changed = []
-battery_plugged = [ "HOME/.local/bin/noctaliaq-gpu-prime on" ]
+battery_plugged = []
 bluetooth_disabled = []
 bluetooth_enabled = []
 colors_changed = [ "HOOK" ]
@@ -315,7 +314,7 @@ widget_order = [ "lockscreen-login-box@eDP-2", "lockscreen-widget-00000000000000
     type = "login_box"
 
         [lockscreen_widgets.widget."lockscreen-login-box@eDP-2".settings]
-        background_color = "surface_variant"
+        background_color = "surface_container"
         background_opacity = 0.76000000000000001
         background_radius = 12.0
         center_password_text = true

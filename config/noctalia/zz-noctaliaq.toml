@@ -1,9 +1,9 @@
 # NoctaliaQ overlay: hooks de GPU/RGB. Se carga al final (zz-) y solo pisa lo que declara.
 [hooks]
-battery_charging = [ "HOME/.local/bin/noctaliaq-gpu-prime on" ]
-battery_discharging = [ "HOME/.local/bin/noctaliaq-gpu-prime off" ]
+battery_charging = []
+battery_discharging = []
 battery_percentage_changed = []
-battery_plugged = [ "HOME/.local/bin/noctaliaq-gpu-prime on" ]
+battery_plugged = []
 bluetooth_disabled = []
 bluetooth_enabled = []
 colors_changed = [ "HOOK" ]

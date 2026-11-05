@@ -63,13 +63,10 @@ action = "overview-open"
 "Mod+Return" = { action = "spawn foot", repeat = false }
 "Mod+B" = { action = "spawn env __EGL_VENDOR_LIBRARY_FILENAMES=/usr/share/glvnd/egl_vendor.d/50_mesa.json zen-browser", repeat = false }
 "Mod+E" = { action = "spawn nautilus", repeat = false }
-"Mod+Alt+G" = { action = "spawn $HOME/.local/bin/noctaliaq-gpu-prime toggle", repeat = false }
-"Mod+Shift+Return" = "spawn noctalia msg panel-toggle wallpaper"
 "XF86Tools" = "spawn noctalia msg panel-toggle control-center"
-"Mod+S" = "spawn noctalia msg settings-toggle"
+"Mod+S" = "spawn noctalia msg panel-toggle control-center"
 "Mod+Space" = "spawn noctalia msg panel-toggle launcher"
 "Mod+Alt+L" = "spawn noctalia msg session lock"
-"Mod+Shift+Q" = "spawn noctalia msg panel-toggle session"
 
 "XF86AudioRaiseVolume" = { action = "spawn noctalia msg volume-up", allow_when_locked = true }
 "XF86AudioLowerVolume" = { action = "spawn noctalia msg volume-down", allow_when_locked = true }
@@ -125,7 +122,6 @@ action = "overview-open"
 "Mod+F" = { action = "window-toggle-maximize", repeat = false }
 "Mod+Shift+F" = { action = "window-toggle-fullscreen", repeat = false }
 "Mod+Shift+T" = { action = "column-toggle-tabbed", repeat = false }
-"Mod+M" = { action = "workspace-set-layout toggle master scrolling", repeat = false }
 "Mod+O" = { action = "overview-toggle", repeat = false }
 
 "Mod+WheelDown" = { action = "workspace-next", cooldown_ms = 150 }
