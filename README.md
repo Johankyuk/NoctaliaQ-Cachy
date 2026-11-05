@@ -46,7 +46,7 @@ El detalle de cada sección (placeholders de rutas, completions, keyd, etc.) est
 
 ## Qué hace install.sh
 
-En este orden: RGB (Alienware), tema de cursor, config de Noctalia, MangoHud (paquete y config),
+En este orden: RGB (despliega el hook de sincronización del teclado; `alienfx` solo se instala si detecta un Alienware), tema de cursor, config de Noctalia, MangoHud (paquete y config),
 MangoHud en flatpaks, PRIME offload en flatpaks, Nautilus con iconos Papirus, niri cfg, zsh
 (paquetes, config y p10k), completions de zsh para noctalia, foot, niri config.kdl, Zen Browser,
 Umbriel (compositor principal), Umbriel como entorno principal, botón de apagado, apps de
