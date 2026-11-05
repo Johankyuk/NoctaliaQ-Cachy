@@ -33,7 +33,7 @@ size = 48
 
 [appearance]
 prefer_no_csd = true
-corner_radius = 20
+corner_radius = 0
 
 [appearance.blur]
 passes = 2
