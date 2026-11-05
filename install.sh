@@ -211,11 +211,7 @@ else
   echo "zen-browser-bin ya instalado, se omite pacman."
 fi
 
-echo "== Miri (config + servicio systemd --user) =="
-backup_and_copy "$REPO_DIR/config/miri/config.toml" "$HOME/.config/miri/config.toml"
-backup_and_copy "$REPO_DIR/config/systemd-user/miri.service" "$HOME/.config/systemd/user/miri.service"
 systemctl --user daemon-reload
-systemctl --user enable miri.service
 
 # dGPU: sesion siempre arranca en ahorro (estado offload off, gamer mode off).
 # Encendido en caliente al conectar AC (hooks battery_*) o con Mod+Alt+G.

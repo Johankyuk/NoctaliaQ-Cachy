@@ -42,7 +42,6 @@ Todo archivo que reemplaza se respalda como `archivo.bak.<timestamp>` antes de s
   línea después, las completions dejan de cargar en silencio.
 - **Foot**: paquete + config + tema dinámico Noctalia.
 - **Zen Browser**: paquete `zen-browser-bin` (repo `cachyos`, sin AUR).
-- **Miri**: `config.toml` + servicio `systemd --user` (habilitado, arranca junto con niri).
 - **keyd**: paquete + `/etc/keyd/default.conf` (requiere root). Mapea el tap de Super a
   `F13`, que XKB entrega como `XF86Tools` — ese es el bind del control center en niri.
   El hold sigue siendo Super normal; el umbral de `overloadt2` (250 ms) aplica igual al
