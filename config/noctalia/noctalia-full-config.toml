@@ -68,7 +68,7 @@ order = [ "default" ]
     shadow = false
     show_on_workspace_switch = true
     smart_auto_hide = false
-    start = [ "spacer_1", "workspaces", "spacer_1", "weather", "spacer_1", "sysmon", "spacer_1", "media", "spacer_1", "audio_vis" ]
+    start = [ "spacer_1", "workspaces", "spacer_1", "weather", "spacer_1", "sysmon", "spacer_1", "media", "spacer_1", "audio_vis", "spacer_1", "lyrics" ]
     thickness = 33
     widget_spacing = 6
 
@@ -826,6 +826,9 @@ show_caps_lock = true
 show_num_lock = true
 show_scroll_lock = false
 type = "lock_keys"
+
+[widget.lyrics]
+type = "h465855hgg/lyrics:lyrics"
 
 [widget.media]
 art_size = 16.0
