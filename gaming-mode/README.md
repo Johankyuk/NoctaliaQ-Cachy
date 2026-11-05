@@ -141,22 +141,9 @@ Mod+Shift+G { spawn "noctaliaq-power" "gaming" "toggle"; }
 
 ## Relación con noctaliaq-gpu-prime
 
-El offload de PRIME lo decide **`noctaliaq-gpu-prime`, y solo él**. Ese script
-verifica el estado real del cargador contra sysfs porque los hooks de Noctalia
-disparan mal durante las transiciones de batería, y usa `flock` y debounce para
-que dos invocaciones no se pisen. Escribe
-`~/.local/state/noctaliaq/gpu-prime-state`, que leen `noctaliaq-gpu-launch`
-(apps nativas) y `noctaliaq-gpu-flatpak-sync` (flatpaks).
+`noctaliaq-gpu-prime` es el dueño del estado de PRIME y de la dGPU física. Escribe `~/.local/state/noctaliaq/gpu-prime-state`, que leen `noctaliaq-gpu-launch` (apps nativas) y `noctaliaq-gpu-flatpak-sync` (flatpaks).
 
-Este módulo **lee ese estado, nunca lo escribe**. Meterle un override sería
-romper la premisa que hace fiable a ese script: no obedecer a nadie salvo a
-sysfs. Lo que hace en cambio:
-
-- `noctaliaq-power status` reporta PRIME y avisa si no concuerda con el
-  cargador, para tener el diagnóstico en un solo sitio.
-- `gaming on` avisa cuando estás con batería, porque en ese caso
-  `noctaliaq-gpu-launch` oculta el ICD de NVIDIA al loader de Vulkan y las apps
-  Vulkan-nativas correrían sobre la iGPU sin que se note.
+El modo gaming lo maneja con dos verbos: `gaming on` llama a `noctaliaq-gpu-prime gaming-on` (enciende la dGPU, PRIME on, variables de offload para todos los flatpaks) aunque estés con batería, y `gaming off` llama a `gaming-off`. Los hooks de batería de Noctalia van vacíos a propósito: nada enciende la dGPU salvo el modo gaming o el toggle manual.
 
 **Sobre el TGP:** el techo no es fijo. En esta máquina el default es 55 W, el
 máximo 140 y `nvidia-powerd` lo mueve en vivo según perfil y térmica (se ha

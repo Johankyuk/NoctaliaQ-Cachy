@@ -26,8 +26,8 @@ mkdir -p "$DIR"
 exec 200>"$LOCK"
 flock -w 5 200 || { logger -t $TAG "no se pudo tomar el lock, abortando"; exit 1; }
 case "${1:-}" in
-  on|off|toggle|boot) ;;
-  *) echo "uso: noctaliaq-gpu-prime [on|off|toggle|boot]" >&2; exit 1 ;;
+  on|off|toggle|boot|gaming-on|gaming-off) ;;
+  *) echo "uso: noctaliaq-gpu-prime [on|off|toggle|boot|gaming-on|gaming-off]" >&2; exit 1 ;;
 esac
 ac() { cat "$AC_PATH" 2>/dev/null || echo 0; }
 notify() { command -v notify-send >/dev/null && notify-send -a "GPU" -i video-display "$1" "$2"; }
@@ -89,6 +89,12 @@ case "$1" in
     echo "$NOW" > "$LAST_AC"
     if [[ "$NOW" == 1 ]]; then set_gpu on "AC conectado [sysfs]" && gamer on
     else set_gpu off "bateria [sysfs]"; gamer off; fi
+    ;;
+  gaming-on)
+    set_gpu on "gaming mode"; ~/.local/bin/noctaliaq-gpu-flatpak-sync
+    ;;
+  gaming-off)
+    set_gpu off "gaming mode"; ~/.local/bin/noctaliaq-gpu-flatpak-sync
     ;;
   toggle)
     if [[ "$(cat "$STATE" 2>/dev/null)" == on ]]; then

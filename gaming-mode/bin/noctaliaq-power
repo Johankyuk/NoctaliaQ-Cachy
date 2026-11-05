@@ -254,6 +254,11 @@ cmd_gaming() {
         powerprofilesctl set "${GAMING_PROFILE:-performance}" 2>/dev/null \
           || warn "no pude fijar el perfil ${GAMING_PROFILE:-performance}"
       fi
+      # dGPU + PRIME (nativos y flatpaks) siguen al modo gaming; va antes del
+      # apply para que la dGPU ya exista cuando se le ajusta el reloj
+      if [[ -x "${HOME:-/root}/.local/bin/noctaliaq-gpu-prime" ]]; then
+        "${HOME:-/root}/.local/bin/noctaliaq-gpu-prime" gaming-on || warn "gpu-prime gaming-on fallo"
+      fi
       cmd_apply "${GAMING_PROFILE:-performance}"
       local dev
       if dev="$(nvidia_pci)" && [[ -w "$dev/power/control" ]]; then
@@ -261,12 +266,6 @@ cmd_gaming() {
           && log "dGPU fijada despierta (runtime PM = ${NV_RUNTIME_GAMING:-on})"
       fi
       [[ -n "${GAMING_ON_EXTRA:-}" ]] && sh -c "$GAMING_ON_EXTRA" >/dev/null 2>&1
-      if [[ "$(ac_online)" == 0 ]]; then
-        # con batería noctaliaq-gpu-launch oculta el ICD de NVIDIA al loader
-        # de Vulkan, así que jugarías sobre la iGPU sin enterarte
-        warn "estás con batería: PRIME está en off y Vulkan no ve la dGPU"
-        notify "Ojo: con batería, PRIME está apagado y las apps Vulkan usarán la iGPU" "battery-caution"
-      fi
       log "modo gaming ON"
       notify "Activado — perfil ${GAMING_PROFILE:-performance}, curvas y dGPU despierta"
       ;;
@@ -276,6 +275,9 @@ cmd_gaming() {
       [[ "$prev" == "${GAMING_PROFILE:-performance}" ]] && prev=balanced
       command -v powerprofilesctl >/dev/null 2>&1 && powerprofilesctl set "$prev" 2>/dev/null
       cmd_apply "$prev"
+      if [[ -x "${HOME:-/root}/.local/bin/noctaliaq-gpu-prime" ]]; then
+        "${HOME:-/root}/.local/bin/noctaliaq-gpu-prime" gaming-off || warn "gpu-prime gaming-off fallo"
+      fi
       [[ -n "${GAMING_OFF_EXTRA:-}" ]] && sh -c "$GAMING_OFF_EXTRA" >/dev/null 2>&1
       rm -f "$GAMING_STATE"
       log "modo gaming OFF (perfil restaurado: $prev)"
@@ -324,11 +326,7 @@ cmd_status() {
   local ac ps tgp
   ac="$(ac_online)"; ps="$(prime_state || true)"
   printf 'PRIME       : %s (AC=%s)' "$ps" "$ac"
-  case "$ac/$ps" in
-    1/on|0/off) printf '\n' ;;
-    "?"/*)      printf '  — sin lectura de AC\n' ;;
-    *)          printf '  ⚠ no concuerda con el cargador\n' ;;
-  esac
+  printf '\n'
   tgp="$(tgp_ceiling)"
   [[ -n "$tgp" ]] && printf 'TGP         : %s (lo mueve nvidia-powerd)\n' "$tgp"
   [[ -r "$GAMING_STATE" ]] && printf 'gaming      : ON (previo: %s)\n' "$(<"$GAMING_STATE")"
