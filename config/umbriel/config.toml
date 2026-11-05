@@ -42,7 +42,7 @@ noise = 0.03
 saturation = 1.0
 
 [layout]
-mode = "master"
+mode = "dwindle"
 gap = 16
 extent_presets = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
 
