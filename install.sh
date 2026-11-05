@@ -294,6 +294,8 @@ echo "== Apps de terminal (cava, cmatrix) =="
 for pkg in cava cmatrix; do
   pacman -Qi "$pkg" &>/dev/null || sudo pacman -S --needed --noconfirm "$pkg"
 done
+# KYU-LAVAT
+pacman -Qi lavat &>/dev/null || paru -S --needed --noconfirm --skipreview lavat
 for f in "$REPO_DIR"/config/applications/noctaliaq-*.desktop; do
   backup_and_copy "$f" "$HOME/.local/share/applications/$(basename "$f")"
 done
