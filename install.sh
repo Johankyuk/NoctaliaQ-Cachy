@@ -54,6 +54,13 @@ fi
 echo "config.toml: rutas resueltas para $USER."
 fi
 
+# KYU-PALETTE-INSTALL
+# Paleta Kyu_Pallete y config completa de Noctalia (rutas /home/kyu resueltas a $HOME).
+mkdir -p "$HOME/.config/noctalia/palettes"
+backup_and_copy "$REPO_DIR/config/noctalia/palettes" "$HOME/.config/noctalia/palettes"
+backup_and_copy "$REPO_DIR/config/noctalia/noctalia-full-config.toml" "$HOME/.config/noctalia/noctalia-full-config.toml"
+sed -i "s|/home/kyu/|$HOME/|g" "$HOME/.config/noctalia/noctalia-full-config.toml"
+
 # --- PATH de la sesión gráfica ---------------------------------------------
 # systemd --user no incluye ~/.local/bin; sin esto, miri y cualquier binario
 # propio son invisibles para el launcher.
