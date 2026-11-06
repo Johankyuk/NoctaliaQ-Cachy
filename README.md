@@ -51,7 +51,7 @@ En este orden: RGB (despliega el hook de sincronización del teclado; `alienfx` 
 MangoHud en flatpaks, PRIME offload en flatpaks, Nautilus con iconos Papirus, niri cfg, zsh
 (paquetes, config y p10k), completions de zsh para noctalia, foot, niri config.kdl, Zen Browser,
 Umbriel (compositor principal), Umbriel como entorno principal, botón de apagado, apps de
-terminal (cava, cmatrix, playerctl) y scripts a `~/.local/bin`.
+terminal (cava, cmatrix, lavat, playerctl) y scripts a `~/.local/bin`.
 
 ## Stack actual
 

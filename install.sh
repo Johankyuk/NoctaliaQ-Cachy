@@ -290,7 +290,7 @@ sudo install -Dm644 "$REPO_DIR/logind/50-noctaliaq-powerkey.conf" /etc/systemd/l
 sudo systemctl kill -s HUP systemd-logind
 
 # KYU-TERMINAL-APPS
-echo "== Apps de terminal (cava, cmatrix, playerctl) =="
+echo "== Apps de terminal (cava, cmatrix, lavat, playerctl) =="
 for pkg in cava cmatrix playerctl; do
   pacman -Qi "$pkg" &>/dev/null || sudo pacman -S --needed --noconfirm "$pkg"
 done
