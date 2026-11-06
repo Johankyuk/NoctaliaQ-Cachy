@@ -1,0 +1,64 @@
+#!/bin/bash
+# noctaliaq-hwprobe: reporta, solo lectura, que mecanismos de GPU hibrida,
+# energia y ventiladores ofrece este equipo. Sirve en cualquier portatil.
+set -u
+rd() { if [ -r "$1" ]; then cat "$1" 2>/dev/null; else echo "-"; fi; }
+sec() { printf '\n== %s\n' "$1"; }
+have() { command -v "$1" >/dev/null 2>&1 && echo "si" || echo "no"; }
+
+echo "noctaliaq-hwprobe $(date +%F)"
+
+sec "Equipo"
+printf 'vendor : %s\nmodelo : %s\nkernel : %s\ninit   : %s\n' \
+  "$(rd /sys/class/dmi/id/sys_vendor)" "$(rd /sys/class/dmi/id/product_name)" \
+  "$(uname -r)" "$(ps -p 1 -o comm= 2>/dev/null || echo '?')"
+
+sec "GPUs (PCI)"
+for d in /sys/bus/pci/devices/*; do
+  [ -e "$d/class" ] || continue
+  case "$(rd "$d/class")" in 0x03*) ;; *) continue ;; esac
+  if [ -e "$d/driver" ]; then drv=$(basename "$(readlink -f "$d/driver")"); else drv="-"; fi
+  printf '%s vendor=%s driver=%s boot_vga=%s control=%s runtime=%s d3cold=%s\n' \
+    "$(basename "$d")" "$(rd "$d/vendor")" "$drv" "$(rd "$d/boot_vga")" \
+    "$(rd "$d/power/control")" "$(rd "$d/power/runtime_status")" "$(rd "$d/d3cold_allowed")"
+done
+
+sec "Apagado fisico de la dGPU: backends posibles"
+printf 'asus-armoury dgpu_disable : %s\n' \
+  "$([ -e /sys/class/firmware-attributes/asus-armoury/attributes/dgpu_disable/current_value ] && echo si || echo no)"
+printf 'asus-nb-wmi dgpu_disable  : %s\n' \
+  "$([ -e /sys/devices/platform/asus-nb-wmi/dgpu_disable ] && echo si || echo no)"
+printf 'firmware-attributes       : %s\n' \
+  "$(ls /sys/class/firmware-attributes 2>/dev/null | tr '\n' ' ')"
+for t in supergfxctl envycontrol optimus-manager system76-power prime-select; do
+  printf '%-26s: %s\n' "$t" "$(have "$t")"
+done
+
+sec "NVIDIA"
+printf 'modulo nvidia    : %s\n' "$(rd /sys/module/nvidia/version)"
+printf 'nvidia-powerd    : %s\n' "$(systemctl list-unit-files nvidia-powerd.service 2>/dev/null | grep -c nvidia-powerd) unidad(es)"
+printf 'ACPI NVDA*       : %s\n' "$(ls /sys/bus/acpi/devices 2>/dev/null | grep -E '^NVDA' | tr '\n' ' ')"
+grep -hE 'DynamicPowerManagement' /proc/driver/nvidia/params 2>/dev/null
+for g in /proc/driver/nvidia/gpus/*; do
+  [ -e "$g/power" ] && { echo "[$(basename "$g")]"; sed -n '1,4p' "$g/power"; }
+done
+
+sec "Perfiles de energia"
+printf 'platform_profile : %s (opciones: %s)\n' "$(rd /sys/firmware/acpi/platform_profile)" "$(rd /sys/firmware/acpi/platform_profile_choices)"
+printf 'powerprofilesctl : %s (%s)\n' "$(have powerprofilesctl)" "$(powerprofilesctl get 2>/dev/null || echo -)"
+printf 'tuned-adm        : %s\n' "$(have tuned-adm)"
+
+sec "Ventiladores (hwmon)"
+for h in /sys/class/hwmon/hwmon*; do
+  [ -e "$h/name" ] || continue
+  curva=""
+  compgen -G "$h/pwm*_auto_point1_temp" >/dev/null && curva=" [curva editable]"
+  printf '%s %s%s\n' "$(basename "$h")" "$(rd "$h/name")" "$curva"
+done
+
+sec "Bateria"
+for b in /sys/class/power_supply/BAT*; do
+  [ -e "$b" ] || continue
+  printf '%s status=%s power_now=%s\n' "$(basename "$b")" "$(rd "$b/status")" "$(rd "$b/power_now")"
+done
+echo "(fin del reporte)"
