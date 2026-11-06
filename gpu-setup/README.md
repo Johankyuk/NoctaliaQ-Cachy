@@ -7,7 +7,7 @@ Control físico de la dGPU en portátiles ASUS (`dgpu_disable`). `install.sh` lo
 |---|---|
 | `deploy-dgpu.sh` | Instalador. Requiere root y es idempotente. Deja `nvidia-powerd` deshabilitado al arranque |
 | `noctaliaq-dgpu` | Enciende o apaga la dGPU físicamente. Corre como root vía pkexec o desde el servicio de arranque. `off` verifica que nadie la use antes de quitarla del bus PCI |
-| `noctaliaq-dgpu-boot.service` | Servicio de sistema que apaga la dGPU al arrancar |
+| `noctaliaq-dgpu-boot.service` | Servicio de sistema que apaga la dGPU al arrancar y otra vez al apagar el equipo, para que el siguiente arranque empiece sin dGPU (cachyos-drm-awaiter falla si la ve al inicio y nvidia no carga) |
 | `org.noctaliaq.dgpu.policy` | Acción polkit `org.noctaliaq.dgpu` para usar pkexec sin contraseña de root |
 | `49-noctaliaq-dgpu.rules` | Regla polkit; `deploy-dgpu.sh` la instala en `/etc/polkit-1/rules.d/` |
 
