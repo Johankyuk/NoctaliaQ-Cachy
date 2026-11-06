@@ -43,7 +43,7 @@ El detalle de cada sección (placeholders de rutas, completions, keyd, etc.) est
 | [`greeter-setup/`](greeter-setup/README.md) | SDDM a greetd + noctalia-greeter | Manual, sin uso hoy |
 | [`alienware-setup/`](alienware-setup/README.md) | RGB para un Alienware | Sin soporte |
 | [`handoffs/`](handoffs/README.md) | Notas de sesiones de trabajo | Historial |
-| [`docs/`](docs/notas-odyssey.md) | Detalle de instalación y notas de migración a Odyssey | Vigente |
+| [`docs/`](docs/) | [Detalle de instalación](docs/instalacion-detalle.md) y [notas de migración a Odyssey](docs/notas-odyssey.md) | Vigente |
 
 ## Qué hace install.sh
 
