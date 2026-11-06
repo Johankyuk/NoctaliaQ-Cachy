@@ -47,7 +47,9 @@ Verificacion rapida:
 - Sin `nvidia-powerd` la dGPU se suspende unos 0.85 s cada unos 25 s (`runtime_suspended_time` sube 1.7 a 2.6 s por cada 60 s) y vuelve a `active`.
 - Descartado: Noctalia (pausado con SIGSTOP: 1.7 s contra 2.6 s por 60 s) y el sondeo de conectores `drm_kms_helper.poll` (con `N`: 2.4 s, con `Y`: 1.9 s). Nadie abre `card0` ni `renderD129`, que son los nodos DRM de la dGPU. No hay timers que la consulten, y `noctaliaq-power` no llama a `nvidia-smi` si la dGPU esta suspendida.
 - Opciones de modulo vistas: `NVreg_PreserveVideoMemoryAllocations=1` y `NVreg_InitializeSystemMemoryAllocations=0`. No se vio `NVreg_DynamicPowerManagement` en `modprobe.d`.
-- Sin resolver: quien la despierta cada unos 25 s. Idea pendiente: rastrear eventos `rpm_resume` del kernel con `ftrace`.
+- Causa encontrada con `ftrace` (eventos `rpm_resume`, `rpm_suspend` y `rpm_idle` filtrados a 01:00.0 y su bridge 00:01.1, con stack por evento, 100 s, sin `nvidia-powerd`): la despierta una notificacion ACPI de NVPCF que atiende el propio driver. Stack: `acpi_ev_notify_dispatch` > `rm_acpi_nvpcf_notify` > `os_ref_dynamic_power` > `nv_indicate_not_idle` > `__pm_runtime_resume`. No es un proceso de usuario: nadie tenia abierto `/dev/nvidia*` y los demas resumes fueron kworkers y `nv_queue` del driver.
+- Ciclo medido: periodo de 23.1 s (suspending 1 s, suspended 1 s, resuming 1 s, active unos 20 s), asi que la dGPU pasa cerca del 90% del tiempo activa. Hipotesis sin probar: el firmware manda esa notificacion periodicamente (NVPCF es el canal de Dynamic Boost) y no se conoce opcion de usuario para evitarla. Log: `~/mediciones-gpu/rpm-trace-20261106-131815.txt`.
+- Conclusion practica: en bateria usar ahorro (dGPU apagada); hibrido solo con el modo juego.
 - En la config de Noctalia `gpu_poll_seconds = 5.0` quedo intacto: el widget de la barra no muestra stats de GPU.
 - Estado al terminar las mediciones: `nvidia-powerd` detenido a mano y dGPU apagada con `sudo noctaliaq-dgpu off`. `noctaliaq-dgpu on` o el modo juego la reactivan.
 
