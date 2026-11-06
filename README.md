@@ -56,7 +56,7 @@ terminal (cava, cmatrix, lavat, playerctl) y scripts a `~/.local/bin`.
 ## Stack actual
 
 - Sesión: Umbriel, con SDDM como display manager.
-- Shell: Noctalia v5. La barra incluye visualizador de audio y el plugin lyrics.
+- Shell: Noctalia v5. La barra incluye visualizador de audio.
 - Terminal foot, archivos Nautilus con Papirus, navegador Zen, cursor `capitaine-cursors`.
 - Gráficos: PRIME offload; el modo juego enciende la dGPU y PRIME para apps nativas y flatpaks.
 - Apps de terminal en el launcher: cava, cmatrix y lavat.
