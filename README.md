@@ -43,6 +43,7 @@ El detalle de cada sección (placeholders de rutas, completions, keyd, etc.) est
 | [`greeter-setup/`](greeter-setup/README.md) | SDDM a greetd + noctalia-greeter | Manual, sin uso hoy |
 | [`alienware-setup/`](alienware-setup/README.md) | RGB para un Alienware | Sin soporte |
 | [`handoffs/`](handoffs/README.md) | Notas de sesiones de trabajo | Historial |
+| [`docs/`](docs/notas-odyssey.md) | Detalle de instalación y notas de migración a Odyssey | Vigente |
 
 ## Qué hace install.sh
 
@@ -65,3 +66,4 @@ terminal (cava, cmatrix, playerctl) y scripts a `~/.local/bin`.
 - Falta agregar el greeter de Noctalia. Hoy se usa SDDM; `greeter-setup/` es manual y no está en uso.
 - `config/niri` es legado: niri solo es la base de CachyOS.
 - Lo de Alienware fue una adaptación para un compañero y no tiene soporte.
+- Para migrar a Odyssey, ver [docs/notas-odyssey.md](docs/notas-odyssey.md) (extensión NVIDIA de flatpak y dGPU al apagar).
