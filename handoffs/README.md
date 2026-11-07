@@ -17,3 +17,4 @@ Notas de sesiones de trabajo: qué se cambió y por qué. Son historial, no se d
 | 2026-09-13 | [Dolphin fuera: Nautilus + plantilla papirus-icons](2026-09-13-dolphin-fuera-nautilus-papirus.md) |
 | 2026-09-13 | [Keybinds: tap de Super vía keyd, resize por presets y limpieza](2026-09-13-keybinds-keyd-y-resize.md) |
 | 2026-09-26 | [dGPU en ahorro al arrancar + encendido en caliente + gamer mode con AC](2026-09-26-dgpu-ahorro-gamer-mode.md) |
+| 2026-11-07 | [Port a Odyssey (Void/runit): control genérico de dGPU híbrida](2026-11-07-odyssey-port-generico.md) |
