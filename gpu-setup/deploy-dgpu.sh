@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
-# deploy-dgpu.sh — instala el control fisico de la dGPU (ASUS dgpu_disable). Requiere root. Idempotente.
+# deploy-dgpu.sh — instala el control de la dGPU (backends: firmware ASUS, runtime-pm). Requiere root. Idempotente.
 # nvidia-powerd queda deshabilitado al arranque: noctaliaq-dgpu lo arranca/para con la dGPU.
 set -uo pipefail
 [[ $EUID -eq 0 ]] || { echo "ABORT: correr con sudo"; exit 1; }
 D="$(cd "$(dirname "$0")" && pwd)"
-[[ -e /sys/devices/platform/asus-nb-wmi/dgpu_disable ]] || { echo "sin asus-nb-wmi: nada que instalar en esta maquina"; exit 0; }
+B="$(bash "$D/noctaliaq-dgpu" backend)"
+[[ "$B" != none ]] || { echo "sin backend para la dGPU: nada que instalar en esta maquina"; exit 0; }
+echo "backend de la dGPU: $B"
 MAP=(
   "noctaliaq-dgpu:/usr/local/bin/noctaliaq-dgpu:755"
   "org.noctaliaq.dgpu.policy:/usr/share/polkit-1/actions/org.noctaliaq.dgpu.policy:644"
