@@ -140,7 +140,7 @@ probe() {
 
   head2 "Noctalia"
   command -v noctalia >/dev/null 2>&1 && ok "binario noctalia presente" || warn "no encontré 'noctalia' en PATH"
-  [[ -f "$HOME/.config/noctalia/config.toml" ]] && ok "config desplegado" || warn "sin ~/.config/noctalia/config.toml"
+  [[ -f "$HOME/.config/noctalia/config.toml" || -f "$HOME/.config/noctalia/noctalia-full-config.toml" ]] && ok "config desplegado" || warn "sin config de Noctalia en ~/.config/noctalia"
   [[ -f "$REPO_DIR/config/noctalia/config.toml" ]] && ok "config del repo: $REPO_DIR/config/noctalia/config.toml" \
                                                    || warn "no detecté el repo (¿corriendo fuera de NoctaliaQ-Cachy?)"
   id -nG | tr ' ' '\n' | grep -qx wheel && ok "estás en el grupo wheel" || die "no estás en 'wheel': las reglas udev/polkit no te servirían"
@@ -323,11 +323,11 @@ verify() {
   ok "sintaxis de los scripts correcta"
   # buscar el comando, no el nombre de la clave: un array vacío también matchea
   local n
-  n="$(grep -c 'noctaliaq-power' "$HOME/.config/noctalia/config.toml" 2>/dev/null || echo 0)"
+  n="$(cat "$HOME/.config/noctalia/config.toml" "$HOME/.config/noctalia/zz-noctaliaq.toml" 2>/dev/null | grep -c 'noctaliaq-power')"
   if [[ "$n" -ge 2 ]]; then
     ok "los dos hooks presentes en el config desplegado"
   else
-    die "solo $n de 2 hooks en ~/.config/noctalia/config.toml — la sincronía no quedaría activa"
+    die "solo $n de 2 hooks en config.toml o zz-noctaliaq.toml — la sincronía no quedaría activa"
   fi
   n="$(command ls "$HOME/.local/share/applications"/noctaliaq-*.desktop 2>/dev/null | wc -l)"
   [[ "$n" -ge 4 ]] && ok "$n entradas en el launcher" || warn "solo $n entradas .desktop"
