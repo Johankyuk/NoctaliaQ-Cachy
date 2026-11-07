@@ -63,7 +63,7 @@ probe() {
     [[ -r "$WMI/gpu_mux_mode" ]] && info "gpu_mux_mode = $(<"$WMI/gpu_mux_mode") (no se toca)"
     [[ -r "$WMI/throttle_thermal_policy" ]] && info "throttle_thermal_policy = $(<"$WMI/throttle_thermal_policy")"
   else
-    die "no hay $WMI — este módulo asume una ASUS con asus-nb-wmi"
+    warn "no hay $WMI: equipo sin asus-nb-wmi; se omiten dgpu_disable y las curvas de ventilador (el resto no esta probado fuera de ASUS)"
   fi
 
   head2 "Curvas de ventilador"
