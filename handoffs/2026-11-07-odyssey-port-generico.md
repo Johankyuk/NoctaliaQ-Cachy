@@ -3,6 +3,7 @@
 **Fecha:** 2026-11-07
 **Repo:** `Johankyuk/NoctaliaQ-Cachy`, rama `main`
 **Último commit al escribir esto:** `77025d6`
+**Actualizado:** 2026-11-11, por decisión de Kyu del 2026-11-10: en Odyssey la dGPU es **solo manual**. La sección 10 define el alcance del paquete y prevalece donde otras secciones sugieran automatizar (modos de la sección 1, servicio de arranque y resume de la sección 5).
 **Para quién:** un agente con contexto de Odyssey (Void Linux, runit). Este documento no asume nada de la conversación que lo generó. Lo marcado como **no verificado** lo dijo Kyu o es una hipótesis, no se comprobó en esa sesión.
 
 ---
@@ -139,10 +140,46 @@ El sondeo en el equipo de referencia con la dGPU apagada: solo aparece la iGPU y
 
 **Commits de esta línea de trabajo:** `a4bf1e6`, `03c4822`, `dd07bc2` (sesión del 5-6 nov: pantalla azul, notas y README), `d32768f`, `eebb188`, `7c0a525`, `eb077f8`, `d5a7034` (`noctaliaq-hwprobe`), `fa59006` (`noctaliaq-dgpu` con backends y despliegue genérico), `ed83784`, `ae325b8`, `77025d6`.
 
-**Orden de trabajo sugerido:**
+**Orden de trabajo sugerido** (ajustado el 2026-11-11 al default manual de la sección 10):
 
-1. Responder la sección 6 con lo que sepa Odyssey.
-2. Portar el servicio de arranque de la dGPU a runit y probar el ciclo real con salida de emergencia a mano.
-3. Adaptar `deploy-dgpu.sh` e `install.sh` (init y paquetes).
-4. Gancho de resume equivalente.
-5. Repetir el procedimiento de medición de `docs/notas-odyssey.md` en Odyssey para comparar con 8.97 W y 23.05 W.
+1. Responder las preguntas vigentes de la sección 6 (3, 4, 5, 7 y 8).
+2. Correr `noctaliaq-hwprobe --report` y `noctaliaq-dgpu backend|status` en Odyssey; comprobar qué atributo de `dgpu_disable` existe en el kernel 6.x y si el comando de 10.1 enciende la dGPU.
+3. Empaquetar solo lo definido en la sección 10 (sin servicio de arranque, sin polkit, sin gancho de resume).
+4. Repetir el procedimiento de medición de `docs/notas-odyssey.md` en Odyssey para comparar con 8.97 W y 23.05 W.
+
+## 10. Default manual de la dGPU en Odyssey (decisión de Kyu, 2026-11-10)
+
+**Decisión:** en Odyssey la dGPU es **manual**: sin automatización; el usuario ejecuta `on` y `off` a mano. Motivo: en CachyOS el firmware queda con `dgpu_disable=1` (el `ExecStop` de `noctaliaq-dgpu-boot.service` lo fuerza en cada apagado), y otra distro instalada o arrancada después no ve la NVIDIA ni carga el driver sin piezas extra.
+
+**Dentro del paquete:** `noctaliaq-dgpu` (`on`, `off`, `status` manuales), `noctaliaq-hwprobe`, el wizard (aquí: el sondeo `--probe` de `gaming-mode/install-gaming-mode.sh`, solo lectura) y una nota corta.
+
+**Fuera del paquete:** `noctaliaq-dgpu-boot.service`, `noctaliaq-gpu-prime` (disparo por AC), la regla polkit, cualquier `ExecStop`, y todo lo de Noctalia, gaming-mode (salvo el sondeo del wizard) y teclado. `deploy-dgpu.sh` tampoco sirve tal cual: instala la unidad de arranque y la regla polkit.
+
+**De la sección 6** siguen vigentes las preguntas 3, 4, 5, 7 y 8; la 1, la 2 y la 6 dejan de aplicar (no hay servicio de arranque, ni polkit, ni gancho de resume). **De la sección 5** solo aplica lo de `nvidia-powerd` (`systemctl` dentro de `noctaliaq-dgpu`); el resto queda fuera de alcance.
+
+### 10.1 Encendido manual
+
+Como root, en el equipo de referencia (misma secuencia que `fw_on` de `noctaliaq-dgpu`, probada en CachyOS, kernel 7.3.1):
+
+~~~sh
+echo 0 > /sys/devices/platform/asus-nb-wmi/dgpu_disable && sleep 1 && echo 1 > /sys/bus/pci/rescan && modprobe nvidia_drm
+~~~
+
+Con el paquete instalado es `noctaliaq-dgpu on`. **No verificado en el kernel de Odyssey (6.x):** el atributo podría ser el de `asus-armoury` (`/sys/class/firmware-attributes/asus-armoury/attributes/dgpu_disable/current_value`); en el equipo de referencia con kernel 7 existen los dos y su semántica no se comparó. Si la NVIDIA no aparece tras el rescan, el comando no sirvió en ese kernel.
+
+### 10.2 Detección de "NVIDIA oculta por firmware"
+
+`noctaliaq-hwprobe` y el sondeo del wizard (solo lectura, salida en inglés; no instalan ni modifican nada) detectan la dGPU apagada por firmware: ningún dispositivo NVIDIA de clase VGA/3D en el bus PCI (equivale a `lspci` sin NVIDIA, leído de sysfs) y `dgpu_disable=1`. En ese caso informan que está apagada por firmware y muestran el comando de 10.1 marcado como no verificado en el kernel de Odyssey. `noctaliaq-hwprobe --report` incluye `dgpu_disable`, `nvidia_visible` y `nvidia_driver_loaded` (yes/no).
+
+### 10.3 Acoplamiento Odyssey -> Cachy (estado: lectura hecha, prueba pendiente)
+
+En modo manual Odyssey puede dejar `dgpu_disable=0` al apagar, y Cachy arrancaría con la NVIDIA visible. Lo leído en CachyOS (unit files, generador y tiempos del arranque del 2026-11-11, con `dgpu_disable=1`):
+
+- `cachyos-drm-awaiter` no es una unidad: es el generador `drm-module-awaiter-generator`, que crea `drm-module-load.target` en cada arranque. Recorre `/sys/bus/pci/devices` y, si ve una GPU NVIDIA con módulo `nvidia` cargable, agrega `nvidia_drm` a lo que espera. Con la dGPU oculta solo espera `amdgpu`.
+- El target tiene `JobTimeoutSec=30s` y `OnFailure=emergency.target drm-failure-handler.service` (la pantalla azul), y va `Before=display-manager.service` y `getty@tty1`.
+- `noctaliaq-dgpu-boot.service` no tiene ninguna relación de orden con ese target ni con los `sys-module-*.device`: solo `After=systemd-modules-load.service` y `Before=display-manager.service greetd.service`.
+- Tiempos (µs desde el arranque del kernel): servicio 7392609 a 7447434; `sys-module-amdgpu.device` 7850467; `plymouth-quit` 8709308; `drm-module-load.target` 8710153; sddm 8711252.
+
+**Conclusión de la lectura:** no decide. El generador fija lo que espera con lo que hay en el bus antes de que corra ningún servicio, así que con la NVIDIA visible el target esperará `sys-module-nvidia_drm.device`. Hipótesis sin probar: si `noctaliaq-dgpu-boot` (hacia los 7.4 s) quita la dGPU del bus antes de que `nvidia` la haya enlazado, el módulo falla (`NVRM: No NVIDIA GPU found`, ver 4.2), `nvidia_drm` no carga y el target vence a los 30 s; si ya cargó, el servicio no debería afectar al target; y si algo tiene abierta la dGPU, el servicio sale con 3 y la deja encendida. Cuál ocurre depende de una carrera que systemd no ordena, y con la dGPU oculta no se puede observar.
+
+**Pendiente:** prueba controlada en Cachy (`dgpu_disable=0` y reinicio), solo con OK explícito de Kyu porque puede dar pantalla azul. Si Cachy no se recupera solo, se propone una solución del lado Cachy (por ejemplo una unidad más temprana) y decide Kyu.
