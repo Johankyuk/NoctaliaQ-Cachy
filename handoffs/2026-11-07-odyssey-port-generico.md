@@ -171,15 +171,6 @@ Con el paquete instalado es `noctaliaq-dgpu on`. **No verificado en el kernel de
 
 `noctaliaq-hwprobe` y el sondeo del wizard (solo lectura, salida en inglés; no instalan ni modifican nada) detectan la dGPU apagada por firmware: ningún dispositivo NVIDIA de clase VGA/3D en el bus PCI (equivale a `lspci` sin NVIDIA, leído de sysfs) y `dgpu_disable=1`. En ese caso informan que está apagada por firmware y muestran el comando de 10.1 marcado como no verificado en el kernel de Odyssey. `noctaliaq-hwprobe --report` incluye `dgpu_disable`, `nvidia_visible` y `nvidia_driver_loaded` (yes/no).
 
-### 10.3 Acoplamiento Odyssey -> Cachy (estado: lectura hecha, prueba pendiente)
+### 10.3 Acoplamiento Odyssey -> Cachy (decisión: sin prueba, solo advertencia)
 
-En modo manual Odyssey puede dejar `dgpu_disable=0` al apagar, y Cachy arrancaría con la NVIDIA visible. Lo leído en CachyOS (unit files, generador y tiempos del arranque del 2026-11-11, con `dgpu_disable=1`):
-
-- `cachyos-drm-awaiter` no es una unidad: es el generador `drm-module-awaiter-generator`, que crea `drm-module-load.target` en cada arranque. Recorre `/sys/bus/pci/devices` y, si ve una GPU NVIDIA con módulo `nvidia` cargable, agrega `nvidia_drm` a lo que espera. Con la dGPU oculta solo espera `amdgpu`.
-- El target tiene `JobTimeoutSec=30s` y `OnFailure=emergency.target drm-failure-handler.service` (la pantalla azul), y va `Before=display-manager.service` y `getty@tty1`.
-- `noctaliaq-dgpu-boot.service` no tiene ninguna relación de orden con ese target ni con los `sys-module-*.device`: solo `After=systemd-modules-load.service` y `Before=display-manager.service greetd.service`.
-- Tiempos (µs desde el arranque del kernel): servicio 7392609 a 7447434; `sys-module-amdgpu.device` 7850467; `plymouth-quit` 8709308; `drm-module-load.target` 8710153; sddm 8711252.
-
-**Conclusión de la lectura:** no decide. El generador fija lo que espera con lo que hay en el bus antes de que corra ningún servicio, así que con la NVIDIA visible el target esperará `sys-module-nvidia_drm.device`. Hipótesis sin probar: si `noctaliaq-dgpu-boot` (hacia los 7.4 s) quita la dGPU del bus antes de que `nvidia` la haya enlazado, el módulo falla (`NVRM: No NVIDIA GPU found`, ver 4.2), `nvidia_drm` no carga y el target vence a los 30 s; si ya cargó, el servicio no debería afectar al target; y si algo tiene abierta la dGPU, el servicio sale con 3 y la deja encendida. Cuál ocurre depende de una carrera que systemd no ordena, y con la dGPU oculta no se puede observar.
-
-**Pendiente:** prueba controlada en Cachy (`dgpu_disable=0` y reinicio), solo con OK explícito de Kyu porque puede dar pantalla azul. Si Cachy no se recupera solo, se propone una solución del lado Cachy (por ejemplo una unidad más temprana) y decide Kyu.
+**Advertencia:** si en Odyssey se enciende la dGPU a mano y se apaga el equipo sin volver a apagarla, `dgpu_disable` queda en 0 y Cachy arranca con la NVIDIA visible; el awaiter de Cachy puede fallar (pantalla azul tras 30 s). Solo afecta a quien alterna Odyssey y Cachy en el mismo equipo. Decisión de Kyu (2026-11-11): no se prueba ni se automatiza nada en el paquete; es responsabilidad de quien enciende la dGPU a mano. El mecanismo y las hipótesis están en `2026-11-11-odyssey-dgpu-manual-sesion.md`, sección 5.
