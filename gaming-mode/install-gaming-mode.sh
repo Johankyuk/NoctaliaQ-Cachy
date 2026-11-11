@@ -115,6 +115,24 @@ probe() {
       *)      info "otra GPU ${dev##*/}" ;;
     esac
   done
+  # dGPU state (read-only): hidden by firmware = no NVIDIA on the PCI bus and dgpu_disable=1
+  local dgd="" nv_visible=no nv_driver=no
+  local arm=/sys/class/firmware-attributes/asus-armoury/attributes/dgpu_disable/current_value
+  if [[ -r "$WMI/dgpu_disable" ]]; then dgd="$(<"$WMI/dgpu_disable")"
+  elif [[ -r "$arm" ]]; then dgd="$(<"$arm")"; fi
+  if [[ -n "$dgd" ]]; then
+    for dev in /sys/bus/pci/devices/*; do
+      [[ "$(cat "$dev/vendor" 2>/dev/null)" == 0x10de && "$(cat "$dev/class" 2>/dev/null)" == 0x03* ]] && nv_visible=yes
+    done
+    [[ -d /sys/module/nvidia || -d /sys/module/nouveau ]] && nv_driver=yes
+    info "dGPU state: dgpu_disable=$dgd nvidia_visible=$nv_visible nvidia_driver_loaded=$nv_driver"
+    if [[ "$nv_visible" == no && "$dgd" == 1 ]]; then
+      warn "NVIDIA dGPU is powered off by firmware (dgpu_disable=1), so it is not on the PCI bus"
+      info "to power it on by hand, as root:"
+      info "  echo 0 > /sys/devices/platform/asus-nb-wmi/dgpu_disable && sleep 1 && echo 1 > /sys/bus/pci/rescan && modprobe nvidia_drm"
+      warn "NOT verified on the Odyssey kernel: the attribute may be the asus-armoury one instead"
+    fi
+  fi
   if [[ -n "$PROBE_NV" ]] && command -v nvidia-smi >/dev/null 2>&1; then
     if [[ "$(cat "$PROBE_NV/power/runtime_status" 2>/dev/null)" == suspended ]]; then
       info "dGPU dormida; no la despierto solo para sondear"
