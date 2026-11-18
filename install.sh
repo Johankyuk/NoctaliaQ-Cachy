@@ -175,10 +175,17 @@ if ! pacman -Qi zsh &>/dev/null; then
 else
   echo "zsh ya instalado, se omite pacman."
 fi
-if ! pacman -Qi cachyos-zsh-config &>/dev/null; then
+# KYU-ZSH-VENDOR
+# En CachyOS se usa el paquete; en Arch puro se despliega la copia vendorizada del repo
+# (necesita oh-my-zsh-git y zsh-theme-powerlevel10k-git, del repo local noctaliaq).
+if pacman -Qi cachyos-zsh-config &>/dev/null; then
+  echo "cachyos-zsh-config ya instalado, se omite pacman."
+elif [ -f /usr/share/cachyos-zsh-config/cachyos-config.zsh ]; then
+  echo "cachyos-config.zsh ya presente, se omite."
+elif pacman -Si cachyos-zsh-config &>/dev/null; then
   sudo pacman -S --needed --noconfirm cachyos-zsh-config
 else
-  echo "cachyos-zsh-config ya instalado, se omite pacman."
+  sudo install -Dm644 "$REPO_DIR/config/zsh/cachyos-config.zsh" /usr/share/cachyos-zsh-config/cachyos-config.zsh
 fi
 command -v zoxide &>/dev/null || sudo pacman -S --needed --noconfirm zoxide
 command -v eza &>/dev/null || sudo pacman -S --needed --noconfirm eza
