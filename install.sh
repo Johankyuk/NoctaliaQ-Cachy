@@ -276,6 +276,13 @@ cp -a "$REPO_DIR/config/umbriel/effects/." "$HOME/.config/umbriel/effects/"
 for _f in outputs.toml noctalia.toml; do
   [ -e "$HOME/.config/umbriel/$_f" ] || printf '# placeholder creado por install.sh\n' > "$HOME/.config/umbriel/$_f"
 done
+# KYU-UMBRIEL-SCHEMA
+# Umbriel nuevo: input.focus.follows_mouse ya no acepta booleanos ("off", "sloppy" o "always").
+# El repo conserva true para el umbriel viejo; aqui se convierte la copia desplegada si hace falta.
+if umbriel config validate 2>&1 | grep -q 'follows_mouse (expected'; then
+  sed -i 's/^follows_mouse = true$/follows_mouse = "always"/; s/^follows_mouse = false$/follows_mouse = "off"/' "$HOME/.config/umbriel/config.toml"
+  echo "config.toml: follows_mouse convertido al esquema nuevo de umbriel."
+fi
 umbriel config validate
 
 # KYU-PRINCIPAL-UMBRIEL
