@@ -43,4 +43,12 @@ class Plugin:
             if dest.is_symlink() or dest.exists():
                 dest.unlink()
             shutil.copy2(osr, dest)
+        entries = target / "boot" / "loader" / "entries"
+        if entries.is_dir():
+            for entry in entries.glob("*.conf"):
+                text = entry.read_text()
+                renamed = text.replace("title Arch Linux", "title NoctaliaQ")
+                if renamed == text:
+                    continue
+                entry.write_text(renamed)
         return None
