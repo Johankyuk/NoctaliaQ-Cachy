@@ -218,9 +218,11 @@ files = [
 ]
 
 [animation.windows_in]
+curve = "spring:1,900"
 effect = "reveal"
 
 [animation.windows_out]
+curve = "spring:1,1400"
 effect = "reveal"
 
 [animation.windows_move]
@@ -250,3 +252,6 @@ spawn_when_empty = "foot --app-id scratchterm"
 [[window_rule]]
 match.app_id = "^scratchterm$"
 default_scratchpad = "term"
+
+[animation.windows_drag]
+physics = true
