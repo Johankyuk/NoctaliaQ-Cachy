@@ -30,6 +30,7 @@ cfg = {
     "locale_config": {"kb_layout": "es", "sys_enc": "UTF-8", "sys_lang": "en_US"},
     "network_config": {"type": "nm"},
     "mirror_config": {
+        "optional_repositories": ["multilib"],
         "custom_repositories": [
             {
                 "name": "noctaliaq",
