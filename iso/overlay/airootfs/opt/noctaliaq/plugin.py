@@ -1,4 +1,5 @@
 __archinstall__version__ = 99.0
+import re
 import shutil
 from pathlib import Path
 
@@ -47,7 +48,7 @@ class Plugin:
         if entries.is_dir():
             for entry in entries.glob("*.conf"):
                 text = entry.read_text()
-                renamed = text.replace("title Arch Linux", "title NoctaliaQ")
+                renamed = re.sub(r"^(title\s+)Arch Linux", r"\1NoctaliaQ", text, flags=re.M)
                 if renamed == text:
                     continue
                 entry.write_text(renamed)
