@@ -1,0 +1,7 @@
+NAME="NoctaliaQ"
+PRETTY_NAME="NoctaliaQ"
+ID=arch
+BUILD_ID=rolling
+ANSI_COLOR="38;2;214;79;253"
+HOME_URL="https://github.com/Johankyuk/NoctaliaQ-Cachy"
+LOGO=archlinux-logo

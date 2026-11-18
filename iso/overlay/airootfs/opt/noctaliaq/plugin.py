@@ -37,4 +37,10 @@ class Plugin:
         issue = Path("/etc/issue")
         if issue.exists():
             shutil.copy2(issue, target / "etc" / "issue")
+        osr = Path("/etc/os-release")
+        if osr.exists():
+            dest = target / "etc" / "os-release"
+            if dest.is_symlink() or dest.exists():
+                dest.unlink()
+            shutil.copy2(osr, dest)
         return None
