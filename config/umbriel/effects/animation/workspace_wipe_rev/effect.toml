@@ -1,0 +1,4 @@
+# Barrido de workspaces con el sentido invertido respecto a workspace_wipe.
+[effects.preset.workspace_wipe_rev]
+kind = "animation"
+shader = "shader.glsl"

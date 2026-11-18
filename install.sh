@@ -261,6 +261,8 @@ if [[ -e /sys/devices/platform/asus-nb-wmi/dgpu_disable ]]; then
 else
   rm -f "$HOME/.config/umbriel/drm.toml"
 fi
+mkdir -p "$HOME/.config/umbriel/effects"
+cp -a "$REPO_DIR/config/umbriel/effects/." "$HOME/.config/umbriel/effects/"
 umbriel config validate
 
 # KYU-PRINCIPAL-UMBRIEL

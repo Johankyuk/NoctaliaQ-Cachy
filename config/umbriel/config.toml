@@ -2,7 +2,7 @@
 # Validar con: umbriel config validate
 
 [include.optional]
-files = ["noctalia.toml", "~/.config/umbriel/drm.toml"]
+files = ["~/.config/umbriel/drm.toml", "outputs.toml", "noctalia.toml"]
 
 [general]
 autostart = ["noctalia"]
@@ -26,6 +26,7 @@ natural_scroll = true
 
 [input.focus]
 follows_mouse = true
+hover_raises = true
 
 [input.cursor]
 theme = "capitaine-cursors"
@@ -44,7 +45,7 @@ saturation = 1.0
 [layout]
 mode = "dwindle"
 gap = 16
-extent_presets = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+extent_presets = [0.333, 0.5, 0.667]
 
 [layout.scrolling]
 default_extent_fraction = 0.5
@@ -111,8 +112,6 @@ action = "overview-open"
 "Mod+BracketRight" = "window-consume-or-expel-right"
 "Mod+Comma" = "window-consume-from-right"
 "Mod+Period" = "window-consume-or-expel-right"
-"Mod+W" = "window-cycle-primary-extent"
-"Mod+Shift+W" = "window-cycle-primary-extent-back"
 "Mod+L" = "window-cycle-secondary-extent"
 "Mod+Shift+L" = "window-cycle-secondary-extent-back"
 "Mod+C" = "column-center"
@@ -122,6 +121,16 @@ action = "overview-open"
 "Mod+Shift+F" = { action = "window-toggle-fullscreen", repeat = false }
 "Mod+Shift+T" = { action = "column-toggle-tabbed", repeat = false }
 "Mod+O" = { action = "overview-toggle", repeat = false }
+"Mod+P" = { action = "window-toggle-pinned", repeat = false }
+"Mod+Minus" = "window-modify-primary-extent -0.02"
+"Mod+Equal" = "window-modify-primary-extent +0.02"
+"Mod+Ctrl+Minus" = "window-modify-secondary-extent -0.02"
+"Mod+Ctrl+Equal" = "window-modify-secondary-extent +0.02"
+"Mod+M" = { action = "workspace-set-layout toggle dwindle scrolling master", repeat = false }
+"Mod+Alt+T" = "layout-toggle-split"
+"Mod+Z" = "scratchpad-toggle term"
+"Mod+Shift+Z" = { action = "window-toggle-scratchpad term", repeat = false }
+"Mod+Ctrl+E" = { action = "effect-border-toggle", repeat = false }
 
 "Mod+WheelDown" = { action = "workspace-next", cooldown_ms = 150 }
 "Mod+WheelUp" = { action = "workspace-previous", cooldown_ms = 150 }
@@ -200,3 +209,44 @@ blur_popups = true
 [[layer_rule]]
 match.namespace = '^noctalia-(notification|dock|panel|attached-panel|osd)$'
 blur_optimized = false
+
+[include]
+files = [
+  "/usr/share/umbriel/effects/animation/reveal/effect.toml",
+  "~/.config/umbriel/effects/animation/workspace_wipe_rev/effect.toml",
+  "/usr/share/umbriel/effects/border/pulse/effect.toml",
+]
+
+[animation.windows_in]
+effect = "reveal"
+
+[animation.windows_out]
+effect = "reveal"
+
+[animation.windows_move]
+enabled = true
+curve = "spring:1,800"
+
+[animation.workspaces]
+style = "reveal"
+effect = "workspace_wipe_rev"
+duration_ms = 300
+curve = "easeout"
+
+[animation.layers]
+enabled = true
+
+[animation.dim_unfocused]
+enabled = true
+dim = 0.15
+
+[effects]
+border = "pulse"
+
+[[scratchpad]]
+name = "term"
+spawn_when_empty = "foot --app-id scratchterm"
+
+[[window_rule]]
+match.app_id = "^scratchterm$"
+default_scratchpad = "term"
