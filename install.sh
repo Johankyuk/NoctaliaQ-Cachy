@@ -266,10 +266,16 @@ backup_and_copy "$REPO_DIR/config/umbriel/config.toml" "$HOME/.config/umbriel/co
 if [[ -e /sys/devices/platform/asus-nb-wmi/dgpu_disable ]]; then
   backup_and_copy "$REPO_DIR/config/umbriel/drm-asus.toml" "$HOME/.config/umbriel/drm.toml"
 else
-  rm -f "$HOME/.config/umbriel/drm.toml"
+  # KYU-UMBRIEL-INCLUDES
+  # Umbriel invalida la config si falta un include y hay politica [drm]: se deja un drm.toml vacio.
+  printf '# sin politica DRM propia (no es un portatil ASUS)\n' > "$HOME/.config/umbriel/drm.toml"
 fi
 mkdir -p "$HOME/.config/umbriel/effects"
 cp -a "$REPO_DIR/config/umbriel/effects/." "$HOME/.config/umbriel/effects/"
+# outputs.toml y noctalia.toml van en [include.optional], pero sin ellos la validacion falla; Noctalia reescribe noctalia.toml.
+for _f in outputs.toml noctalia.toml; do
+  [ -e "$HOME/.config/umbriel/$_f" ] || printf '# placeholder creado por install.sh\n' > "$HOME/.config/umbriel/$_f"
+done
 umbriel config validate
 
 # KYU-PRINCIPAL-UMBRIEL
