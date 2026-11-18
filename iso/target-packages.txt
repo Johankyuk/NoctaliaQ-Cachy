@@ -1,0 +1,68 @@
+# Sistema instalado: solo repos oficiales de Arch (lo del AUR esta en aur-packages.txt).
+base
+linux
+linux-firmware
+sudo
+git
+base-devel
+networkmanager
+efibootmgr
+# GPU: iGPU AMD + dGPU NVIDIA (hibrido)
+mesa
+vulkan-radeon
+vulkan-icd-loader
+nvidia-open
+nvidia-utils
+lib32-nvidia-utils
+nvidia-prime
+libva-nvidia-driver
+switcheroo-control
+power-profiles-daemon
+upower
+# Audio y bluetooth
+pipewire
+pipewire-pulse
+wireplumber
+bluez
+bluez-utils
+# Entorno que install.sh da por instalado
+niri
+sddm
+noctalia
+polkit
+xwayland-satellite
+xdg-desktop-portal
+xdg-desktop-portal-gtk
+xdg-desktop-portal-gnome
+gnome-keyring
+wl-clipboard
+adw-gtk-theme
+noto-fonts
+noto-fonts-emoji
+grim
+slurp
+# Apps y temas del repo
+foot
+nautilus
+papirus-icon-theme
+capitaine-cursors
+cava
+cmatrix
+playerctl
+mangohud
+keyd
+flatpak
+# Zsh
+zsh
+zoxide
+eza
+fzf
+zsh-autosuggestions
+zsh-syntax-highlighting
+zsh-completions
+zsh-history-substring-search
+pkgfile
+powerline-fonts
+vim
+# Sistema
+zram-generator

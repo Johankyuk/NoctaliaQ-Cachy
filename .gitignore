@@ -5,3 +5,9 @@ config/foot/themes/
 
 # El state de Noctalia lo reescribe el daemon; no se versiona.
 config/noctalia/settings.toml
+
+# ISO: artefactos de build
+iso/repo/
+iso/work/
+iso/work-aur/
+iso/out/

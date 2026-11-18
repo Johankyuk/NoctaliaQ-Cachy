@@ -1,0 +1,9 @@
+# No existen en core/extra/multilib de Arch. Se compilan al repo local "noctaliaq".
+# El orden importa: el portal va antes que umbriel-git.
+xdg-desktop-portal-umbriel-git
+umbriel-git
+zen-browser-bin
+lavat
+paru
+oh-my-zsh-git
+zsh-theme-powerlevel10k-git
