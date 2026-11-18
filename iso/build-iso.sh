@@ -21,6 +21,10 @@ A="$W/profile/airootfs/opt/noctaliaq"
 mkdir -p "$A/repo" "$A/src"
 cp -a "$REPO_OUT/." "$A/repo/"
 git -C "$REPO_DIR" archive --format=tar HEAD | tar -x -C "$A/src"
+# KYU-ISO-CFG
+python3 "$HERE/gen-config.py" "$HERE" "$A/archinstall.json"
+cp -a "$HERE/overlay/." "$W/profile/"
+sed -i 's|^  \["/usr/local/bin/choose-mirror"\]="0:0:755"|&\n  ["/usr/local/bin/noctaliaq-install"]="0:0:755"|' "$W/profile/profiledef.sh"
 
 sudo mkarchiso -v -w "$W/work" -o "$OUT" "$W/profile"
 /usr/bin/ls -lh "$OUT"

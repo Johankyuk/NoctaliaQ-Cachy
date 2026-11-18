@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Lanza el instalador de NoctaliaQ (archinstall con la config del repo; disco y usuario se eligen en el menu).
+set -Eeuo pipefail
+[[ $EUID -eq 0 ]] || exec sudo "$0" "$@"
+exec archinstall --config /opt/noctaliaq/archinstall.json "$@"
