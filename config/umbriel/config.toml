@@ -255,3 +255,9 @@ default_scratchpad = "term"
 
 [animation.windows_drag]
 physics = true
+stiffness = 50.0
+damping = 10.0
+coupling = 200.0
+pointer_response = 0.8
+max_displacement_px = 80.0
+settle_after_pause_s = 0.25
