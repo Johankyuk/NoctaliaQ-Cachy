@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# noctaliaq-plugins: habilita una sola vez los plugins de Noctalia del setup.
+# Corre desde el hook started del overlay. Si algo falla no deja marcador y reintenta al siguiente arranque.
+set -u
+if [ -z "${NQ_BG:-}" ]; then
+  NQ_BG=1 setsid "$0" "$@" >/dev/null 2>&1 &
+  exit 0
+fi
+STATE="${XDG_STATE_HOME:-$HOME/.local/state}/noctaliaq"
+MARK="$STATE/plugins-enabled"
+PLUGINS=(noctalia/screen_recorder 8bury/lid-guard notoxus/media-island noctalia/world_clock)
+[ -e "$MARK" ] && exit 0
+command -v noctalia >/dev/null 2>&1 || exit 0
+for _ in $(seq 1 60); do
+  noctalia msg plugins list >/dev/null 2>&1 && break
+  sleep 1
+done
+LIST=$(noctalia msg plugins list 2>/dev/null) || exit 0
+fail=0
+for p in "${PLUGINS[@]}"; do
+  if printf '%s\n' "$LIST" | grep -qE "^$p \[[a-z]+\] [^ ]+ enabled"; then continue; fi
+  if printf '%s\n' "$LIST" | grep -q "^$p "; then
+    noctalia msg plugins enable "$p" || fail=1
+  else
+    echo "plugin no disponible: $p" >&2; fail=1
+  fi
+done
+if [ "$fail" -eq 0 ]; then mkdir -p "$STATE"; touch "$MARK"; fi

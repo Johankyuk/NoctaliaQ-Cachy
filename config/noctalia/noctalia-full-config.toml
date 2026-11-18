@@ -41,7 +41,6 @@ order = [ "default" ]
         "spacer_1",
         "battery",
         "spacer_1",
-        "asus_fan_2",
         "spacer_1",
         "settings",
         "spacer_1",
@@ -481,17 +480,12 @@ scale = 1.0
     volume_output = true
     wifi = true
 
-[plugin_settings."kv7499/asus-fan"]
-display_mode = "both"
-panel_position = "top_center"
-show_label = false
-
 [plugin_settings."noctalia/screen_recorder"]
 frame_rate = 144
 
 [plugins]
 auto_update = "all"
-enabled = [ "noctalia/screen_recorder", "kv7499/asus-fan" ]
+enabled = [ "noctalia/screen_recorder", "8bury/lid-guard", "notoxus/media-island", "noctalia/world_clock" ]
 
     [[plugins.source]]
     enabled = true
@@ -779,12 +773,6 @@ max_length = 260.0
 min_length = 80.0
 title_scroll = "none"
 type = "active_window"
-
-[widget.asus_fan]
-type = "kv7499/asus-fan:asus_fan"
-
-[widget.asus_fan_2]
-type = "kv7499/asus-fan:asus_fan"
 
 [widget.audio_vis]
 bands = 20
