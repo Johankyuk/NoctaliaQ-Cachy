@@ -34,4 +34,7 @@ class Plugin:
         conf = target / "etc" / "pacman.conf"
         if conf.exists():
             dedupe_section(conf, "noctaliaq")
+        issue = Path("/etc/issue")
+        if issue.exists():
+            shutil.copy2(issue, target / "etc" / "issue")
         return None

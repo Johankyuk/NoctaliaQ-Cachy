@@ -21,13 +21,14 @@ for p in read_list("target-packages.txt") + read_list("aur-packages.txt"):
 
 cfg = {
     "version": "4.5",
+    "archinstall-language": "Spanish",
     "hostname": "noctaliaq",
     "kernels": ["linux"],
     "ntp": True,
     "timezone": "America/Mexico_City",
     "swap": {"enabled": True, "algorithm": "zstd"},
     "bootloader_config": {"bootloader": "Systemd-boot", "uki": False, "removable": False},
-    "locale_config": {"kb_layout": "es", "sys_enc": "UTF-8", "sys_lang": "en_US"},
+    "locale_config": {"kb_layout": "es", "sys_enc": "UTF-8", "sys_lang": "es_MX"},
     "network_config": {"type": "nm"},
     "mirror_config": {
         "optional_repositories": ["multilib"],

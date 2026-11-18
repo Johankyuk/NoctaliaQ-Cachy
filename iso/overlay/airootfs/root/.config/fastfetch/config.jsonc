@@ -1,0 +1,27 @@
+{
+  "logo": {
+    "type": "file",
+    "source": "/root/.config/fastfetch/logo.txt",
+    "color": { "1": "#d64ffd", "2": "#fc36c4" },
+    "padding": { "top": 1, "right": 3 }
+  },
+  "display": {
+    "color": { "keys": "#d64ffd", "title": "#fc36c4" },
+    "separator": "  "
+  },
+  "modules": [
+    "title",
+    "separator",
+    { "type": "custom", "key": "OS", "format": "NoctaliaQ (base Arch Linux)" },
+    "kernel",
+    "uptime",
+    "packages",
+    "shell",
+    "cpu",
+    "gpu",
+    "memory",
+    "disk",
+    "break",
+    "colors"
+  ]
+}

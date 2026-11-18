@@ -26,5 +26,7 @@ python3 "$HERE/gen-config.py" "$HERE" "$A/archinstall.json"
 cp -a "$HERE/overlay/." "$W/profile/"
 sed -i 's|^  \["/usr/local/bin/choose-mirror"\]="0:0:755"|&\n  ["/usr/local/bin/noctaliaq-install"]="0:0:755"|' "$W/profile/profiledef.sh"
 
+# KYU-ISO-BRAND
+bash "$HERE/brand.sh" "$W/profile" "$REPO_DIR"
 sudo mkarchiso -v -w "$W/work" -o "$OUT" "$W/profile"
 /usr/bin/ls -lh "$OUT"
