@@ -239,7 +239,7 @@ curve = "easeout"
 enabled = true
 
 [animation.dim_unfocused]
-enabled = true
+enabled = false
 dim = 0.15
 
 [effects]
