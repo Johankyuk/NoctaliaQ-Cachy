@@ -279,8 +279,9 @@ done
 # KYU-UMBRIEL-SCHEMA
 # Umbriel nuevo: input.focus.follows_mouse ya no acepta booleanos ("off", "sloppy" o "always").
 # El repo conserva true para el umbriel viejo; aqui se convierte la copia desplegada si hace falta.
-if umbriel config validate 2>&1 | grep -q 'follows_mouse (expected'; then
-  sed -i 's/^follows_mouse = true$/follows_mouse = "always"/; s/^follows_mouse = false$/follows_mouse = "off"/' "$HOME/.config/umbriel/config.toml"
+umbriel_out=$(umbriel config validate 2>&1 || true)
+if printf '%s\n' "$umbriel_out" | grep -q 'follows_mouse'; then
+  sed -i -E 's/^([[:space:]]*follows_mouse[[:space:]]*=[[:space:]]*)true/\1"always"/; s/^([[:space:]]*follows_mouse[[:space:]]*=[[:space:]]*)false/\1"off"/' "$HOME/.config/umbriel/config.toml"
   echo "config.toml: follows_mouse convertido al esquema nuevo de umbriel."
 fi
 umbriel config validate
