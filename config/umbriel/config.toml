@@ -252,7 +252,6 @@ spawn_when_empty = "foot --app-id scratchterm"
 [[window_rule]]
 match.app_id = "^scratchterm$"
 default_scratchpad = "term"
-default_pinned = true  # KYU-OVERLAY: scratchpad por encima de fullscreen
 
 [animation.windows_drag]
 physics = true
@@ -263,8 +262,3 @@ pointer_response = 0.8
 max_displacement_px = 80.0
 settle_after_pause_s = 0.25
 
-# KYU-ZEN-OPAQUE: sin ver el fondo a traves de zen
-[[window_rule]]
-match.app_id = "^zen$"
-blur = false
-opacity = 1.0
