@@ -15,7 +15,7 @@ RELENG=/usr/share/archiso/configs/releng
 sudo rm -rf "$W"
 mkdir -p "$W" "$OUT"
 cp -r "$RELENG" "$W/profile"
-sed -i 's|^iso_name=.*|iso_name="noctaliaq"|; s|^iso_application=.*|iso_application="NoctaliaQ Arch Live/Installer"|' "$W/profile/profiledef.sh"
+sed -i 's|^iso_name=.*|iso_name="noctaliaq"|; s|^iso_application=.*|iso_application="Porphyx Linux Arch Live/Installer"|' "$W/profile/profiledef.sh"
 
 A="$W/profile/airootfs/opt/noctaliaq"
 mkdir -p "$A/repo" "$A/src"

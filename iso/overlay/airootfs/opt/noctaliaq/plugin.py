@@ -48,7 +48,7 @@ class Plugin:
         if entries.is_dir():
             for entry in entries.glob("*.conf"):
                 text = entry.read_text()
-                renamed = re.sub(r"^(title\s+)Arch Linux", r"\1NoctaliaQ", text, flags=re.M)
+                renamed = re.sub(r"^(title\s+)Arch Linux", r"\1Porphyx Linux", text, flags=re.M)
                 if renamed == text:
                     continue
                 entry.write_text(renamed)
