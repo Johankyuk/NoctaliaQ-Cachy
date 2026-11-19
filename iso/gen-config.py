@@ -22,7 +22,7 @@ for p in read_list("target-packages.txt") + read_list("aur-packages.txt"):
 cfg = {
     "version": "4.5",
     "archinstall-language": "Spanish",
-    "hostname": "noctaliaq",
+    "hostname": "porphyx",
     "kernels": ["linux"],
     "ntp": True,
     "timezone": "America/Mexico_City",
