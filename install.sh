@@ -62,6 +62,9 @@ install -Dm644 "$REPO_DIR/assets/Kyu_PFP.png" "$HOME/.local/share/noctaliaq/Kyu_
 install -Dm644 "$REPO_DIR/assets/wallpapers/Kyu_Wallpaper.png" "$HOME/.local/share/noctaliaq/wallpapers/Kyu_Wallpaper.png"
 mkdir -p "$HOME/.config/noctalia/palettes"
 backup_and_copy "$REPO_DIR/config/noctalia/palettes" "$HOME/.config/noctalia/palettes"
+# KYU-NOCTALIA-TEMPLATES: plantilla palette-raw.conf (la lee el sync de RGB; sin ella noctalia falla al aplicar plantillas)
+mkdir -p "$HOME/.config/noctalia/templates"
+backup_and_copy "$REPO_DIR/config/noctalia/templates" "$HOME/.config/noctalia/templates"
 backup_and_copy "$REPO_DIR/config/noctalia/noctalia-full-config.toml" "$HOME/.config/noctalia/noctalia-full-config.toml"
 sed -i "s|/home/kyu/|$HOME/|g" "$HOME/.config/noctalia/noctalia-full-config.toml"
 
@@ -317,6 +320,12 @@ echo "== Apps de terminal (cava, cmatrix, lavat, playerctl) =="
 for pkg in cava cmatrix playerctl; do
   pacman -Qi "$pkg" &>/dev/null || sudo pacman -S --needed --noconfirm "$pkg"
 done
+# KYU-CAVA-CONFIG: el template de noctalia exige que exista ~/.config/cava/config
+if [ ! -f "$HOME/.config/cava/config" ]; then
+  mkdir -p "$HOME/.config/cava"
+  timeout 3 cava >/dev/null 2>&1 || true
+  [ -f "$HOME/.config/cava/config" ] || printf '[general]\n' > "$HOME/.config/cava/config"
+fi
 # KYU-LAVAT
 pacman -Qi lavat &>/dev/null || paru -S --needed --noconfirm --skipreview lavat
 for f in "$REPO_DIR"/config/applications/noctaliaq-*.desktop; do
