@@ -42,7 +42,7 @@ cfg = {
         ]
     },
     "packages": pkgs,
-    "services": ["bluetooth", "keyd", "switcheroo-control", "power-profiles-daemon", "upower"],
+    "services": ["bluetooth", "keyd", "switcheroo-control", "power-profiles-daemon", "upower", "sddm"],
 }
 out.parent.mkdir(parents=True, exist_ok=True)
 out.write_text(json.dumps(cfg, indent=2) + "\n")
