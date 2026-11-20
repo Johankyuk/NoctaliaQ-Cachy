@@ -28,7 +28,7 @@ cfg = {
     "timezone": "America/Mexico_City",
     "swap": {"enabled": True, "algorithm": "zstd"},
     "bootloader_config": {"bootloader": "Systemd-boot", "uki": False, "removable": False},
-    "locale_config": {"kb_layout": "es", "sys_enc": "UTF-8", "sys_lang": "es_MX"},
+    "locale_config": {"kb_layout": "la-latin1", "sys_enc": "UTF-8", "sys_lang": "es_MX"},
     "network_config": {"type": "nm"},
     "mirror_config": {
         "optional_repositories": ["multilib"],

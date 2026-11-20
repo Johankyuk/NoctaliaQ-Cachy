@@ -27,7 +27,8 @@ bluez
 bluez-utils
 # Entorno que install.sh da por instalado
 niri
-sddm
+greetd
+noctalia-greeter
 noctalia
 polkit
 xwayland-satellite
