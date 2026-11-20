@@ -14,3 +14,6 @@ else
   echo "AVISO: sin magick o sin wallpaper, se deja el splash original"
 fi
 echo "branding aplicado"
+
+# KYU-BUILD-MIRRORS: el build usa mirrors rapidos (el primero del mirrorlist del host puede ser lento)
+perl -pi -e 's|^Include = /etc/pacman\.d/mirrorlist$|Server = https://fastly.mirror.pkgbuild.com/\$repo/os/\$arch\nServer = https://geo.mirror.pkgbuild.com/\$repo/os/\$arch|' "$P/pacman.conf"
