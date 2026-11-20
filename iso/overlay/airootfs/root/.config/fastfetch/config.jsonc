@@ -12,7 +12,7 @@
   "modules": [
     "title",
     "separator",
-    { "type": "custom", "key": "OS", "format": "Porphyx Linux (base Arch Linux)" },
+    { "type": "custom", "key": "OS", "format": "Porphyx Linux" },
     "kernel",
     "uptime",
     "packages",

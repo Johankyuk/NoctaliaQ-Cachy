@@ -48,8 +48,24 @@ class Plugin:
         if entries.is_dir():
             for entry in entries.glob("*.conf"):
                 text = entry.read_text()
-                renamed = re.sub(r"^(title\s+)Arch Linux", r"\1Porphyx Linux", text, flags=re.M)
+                renamed = re.sub(r"^(title\s+)Arch Linux(?: \(linux\))?", r"\1Porphyx Linux", text, flags=re.M)  # KYU-BRAND2
                 if renamed == text:
                     continue
                 entry.write_text(renamed)
+        ff = Path("/root/.config/fastfetch")
+        if ff.is_dir():
+            fdest = target / "etc" / "xdg" / "fastfetch"
+            fdest.mkdir(parents=True, exist_ok=True)
+            for fl in ff.iterdir():
+                if fl.is_file():
+                    shutil.copy2(fl, fdest / fl.name)
+            fcfg = fdest / "config.jsonc"
+            if fcfg.exists():
+                fcfg.write_text(fcfg.read_text().replace("/root/.config/fastfetch/", "/etc/xdg/fastfetch/"))
+        mlist = target / "etc" / "pacman.d" / "mirrorlist"
+        if mlist.exists():
+            mold = mlist.read_text().splitlines(keepends=True)
+            mnew = [ln for ln in mold if "noctaliaq-mirror" not in ln]
+            if len(mnew) < len(mold):
+                mlist.write_text("".join(mnew))
         return None
