@@ -500,7 +500,6 @@ enabled = [ "noctalia/screen_recorder", "8bury/lid-guard", "notoxus/media-island
     name = "community"
 
 [shell]
-app_icon_colorize = false
 avatar_path = "/home/kyu/.local/share/noctaliaq/Kyu_PFP.png"
 button_borders = true
 card_borders = true
