@@ -224,6 +224,9 @@ else
   echo "foot ya instalado, se omite pacman."
 fi
 backup_and_copy "$REPO_DIR/config/foot" "$HOME/.config/foot"
+# KYU-FOOT-SEED: tema inicial; noctalia lo regenera. Sin el, foot falla si noctalia aun no lo genero.
+mkdir -p "$HOME/.config/foot/themes"
+[ -f "$HOME/.config/foot/themes/noctalia" ] || cp "$REPO_DIR/assets/foot-theme-noctalia.seed" "$HOME/.config/foot/themes/noctalia"
 
 # KYU-NIRI-OPCIONAL-2
 if command -v niri >/dev/null 2>&1; then
