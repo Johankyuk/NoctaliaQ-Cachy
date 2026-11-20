@@ -44,6 +44,6 @@ while read -r p; do
   done
 done < "$HERE/aur-packages.txt"
 
-rm -f "$REPO"/noctaliaq.db* "$REPO"/noctaliaq.files*
-repo-add "$REPO/noctaliaq.db.tar.gz" "$REPO"/*.pkg.tar.*
+rm -f "$REPO"/porphyx.db* "$REPO"/porphyx.files*
+repo-add "$REPO/porphyx.db.tar.gz" "$REPO"/*.pkg.tar.*
 echo "repo listo: $REPO"

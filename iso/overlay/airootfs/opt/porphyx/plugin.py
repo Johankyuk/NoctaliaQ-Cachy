@@ -3,7 +3,7 @@ import re
 import shutil
 from pathlib import Path
 
-SRC = Path("/opt/noctaliaq")
+SRC = Path("/opt/porphyx")
 
 
 def dedupe_section(path, name):
@@ -28,13 +28,13 @@ def dedupe_section(path, name):
 class Plugin:
     def on_genfstab(self, installation):
         target = Path(installation.target)
-        shutil.copytree(SRC, target / "opt" / "noctaliaq", symlinks=True, dirs_exist_ok=True)
+        shutil.copytree(SRC, target / "opt" / "porphyx", symlinks=True, dirs_exist_ok=True)
         prof = target / "etc" / "profile.d"
         prof.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(SRC / "firstlogin.sh", prof / "noctaliaq-firstlogin.sh")
+        shutil.copy2(SRC / "firstlogin.sh", prof / "porphyx-firstlogin.sh")
         conf = target / "etc" / "pacman.conf"
         if conf.exists():
-            dedupe_section(conf, "noctaliaq")
+            dedupe_section(conf, "porphyx")
         issue = Path("/etc/issue")
         if issue.exists():
             shutil.copy2(issue, target / "etc" / "issue")
@@ -65,7 +65,7 @@ class Plugin:
         mlist = target / "etc" / "pacman.d" / "mirrorlist"
         if mlist.exists():
             mold = mlist.read_text().splitlines(keepends=True)
-            mnew = [ln for ln in mold if "noctaliaq-mirror" not in ln]
+            mnew = [ln for ln in mold if "porphyx-mirror" not in ln]
             if len(mnew) < len(mold):
                 mlist.write_text("".join(mnew))
         return None

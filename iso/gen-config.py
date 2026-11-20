@@ -32,11 +32,11 @@ cfg = {
     "network_config": {"type": "nm"},
     "mirror_config": {
         "optional_repositories": ["multilib"],
-        "custom_servers": [{"url": "file:///opt/noctaliaq-mirror/$repo/os/$arch"}],
+        "custom_servers": [{"url": "file:///opt/porphyx-mirror/$repo/os/$arch"}],
         "custom_repositories": [
             {
-                "name": "noctaliaq",
-                "url": "file:///opt/noctaliaq/repo",
+                "name": "porphyx",
+                "url": "file:///opt/porphyx/repo",
                 "sign_check": "Optional",
                 "sign_option": "TrustAll",
             }

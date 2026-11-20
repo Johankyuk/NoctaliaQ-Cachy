@@ -2,8 +2,8 @@
 case $- in *i*) ;; *) return 0 ;; esac
 [ "$(id -u)" -ge "${NOCTALIAQ_MINUID:-1000}" ] || return 0
 [ -z "${NOCTALIAQ_SKIP:-}" ] || return 0
-NQ_OPT="${NOCTALIAQ_OPT:-/opt/noctaliaq}"
-NQ_MARK="$HOME/.local/state/noctaliaq/firstlogin.done"
+NQ_OPT="${NOCTALIAQ_OPT:-/opt/porphyx}"
+NQ_MARK="$HOME/.local/state/porphyx/firstlogin.done"
 [ -e "$NQ_MARK" ] && return 0
 [ -d "$NQ_OPT/src" ] || return 0
 [ -d "$HOME/NoctaliaQ-Cachy" ] || cp -R "$NQ_OPT/src" "$HOME/NoctaliaQ-Cachy"

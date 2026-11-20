@@ -2,7 +2,7 @@
 # Lanza el instalador de Porphyx Linux (archinstall con la config del repo; disco y usuario se eligen en el menu).
 set -Eeuo pipefail
 [[ $EUID -eq 0 ]] || exec sudo "$0" "$@"
-setvtrgb /etc/noctaliaq-vtrgb 2>/dev/null || true
+setvtrgb /etc/porphyx-vtrgb 2>/dev/null || true
 G=$(python3 -c "import importlib.util as u; print(u.find_spec('archinstall').submodule_search_locations[0])")
 sed -i "s/title_text = 'Archlinux'/title_text = 'Porphyx Linux'/" "$G/scripts/guided.py" 2>/dev/null || true
-exec archinstall --skip-ntp --skip-wkd --offline --plugin /opt/noctaliaq/plugin.py --config /opt/noctaliaq/archinstall.json "$@"
+exec archinstall --skip-ntp --skip-wkd --offline --plugin /opt/porphyx/plugin.py --config /opt/porphyx/archinstall.json "$@"

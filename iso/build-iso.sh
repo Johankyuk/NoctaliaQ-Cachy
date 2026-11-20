@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Arma la ISO: perfil releng de archiso + repo local + arbol git del repo (HEAD) en /opt/noctaliaq.
+# Arma la ISO: perfil releng de archiso + repo local + arbol git del repo (HEAD) en /opt/porphyx.
 # Requisitos: haber corrido build-local-repo.sh y tener todo commiteado (se copia HEAD, no el working tree).
 set -Eeuo pipefail
 trap 'echo "ERROR: linea $LINENO: $BASH_COMMAND" >&2' ERR
@@ -10,14 +10,14 @@ W="$HERE/work"
 OUT="$HERE/out"
 RELENG=/usr/share/archiso/configs/releng
 
-[[ -f "$REPO_OUT/noctaliaq.db" ]] || { echo "ABORT: falta el repo local, corre iso/build-local-repo.sh"; exit 1; }
+[[ -f "$REPO_OUT/porphyx.db" ]] || { echo "ABORT: falta el repo local, corre iso/build-local-repo.sh"; exit 1; }
 
 sudo rm -rf "$W"
 mkdir -p "$W" "$OUT"
 cp -r "$RELENG" "$W/profile"
-sed -i 's|^iso_name=.*|iso_name="noctaliaq"|; s|^iso_application=.*|iso_application="Porphyx Linux Arch Live/Installer"|' "$W/profile/profiledef.sh"
+sed -i 's|^iso_name=.*|iso_name="porphyx"|; s|^iso_application=.*|iso_application="Porphyx Linux Arch Live/Installer"|' "$W/profile/profiledef.sh"
 
-A="$W/profile/airootfs/opt/noctaliaq"
+A="$W/profile/airootfs/opt/porphyx"
 mkdir -p "$A/repo" "$A/src"
 cp -a "$REPO_OUT/." "$A/repo/"
 git -C "$REPO_DIR" archive --format=tar HEAD | tar -x -C "$A/src"
@@ -28,8 +28,8 @@ sed -i 's|^  \["/usr/local/bin/choose-mirror"\]="0:0:755"|&\n  ["/usr/local/bin/
 
 # KYU-ISO-MIRROR
 [[ -d "$HERE/mirror/core" ]] || { echo "ABORT: falta iso/mirror, corre iso/build-offline-mirror.sh"; exit 1; }
-mkdir -p "$W/profile/airootfs/opt/noctaliaq-mirror"
-cp -a "$HERE/mirror/." "$W/profile/airootfs/opt/noctaliaq-mirror/"
+mkdir -p "$W/profile/airootfs/opt/porphyx-mirror"
+cp -a "$HERE/mirror/." "$W/profile/airootfs/opt/porphyx-mirror/"
 
 # KYU-ISO-BRAND
 bash "$HERE/brand.sh" "$W/profile" "$REPO_DIR"

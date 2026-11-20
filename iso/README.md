@@ -1,6 +1,6 @@
 # iso/
 
-ISO de Arch (archiso) construida desde este mismo repo. El arbol git (HEAD) viaja dentro de la ISO en /opt/noctaliaq/src, asi que lo que se instala es lo que hay en el repo.
+ISO de Arch (archiso) construida desde este mismo repo. El arbol git (HEAD) viaja dentro de la ISO en /opt/porphyx/src, asi que lo que se instala es lo que hay en el repo.
 
 | Archivo | Que es |
 |---|---|

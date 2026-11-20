@@ -1,4 +1,4 @@
-# No existen en core/extra/multilib de Arch. Se compilan al repo local "noctaliaq".
+# No existen en core/extra/multilib de Arch. Se compilan al repo local "porphyx".
 # El orden importa: el portal va antes que umbriel-git.
 xdg-desktop-portal-umbriel-git
 umbriel-git
