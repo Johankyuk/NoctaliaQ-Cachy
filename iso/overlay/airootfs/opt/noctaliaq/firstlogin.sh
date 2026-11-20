@@ -11,6 +11,8 @@ echo "Porphyx Linux: primer inicio, desplegando el setup del repo (pedira tu con
 if (cd "$HOME/NoctaliaQ-Cachy" && bash ./install.sh); then
   mkdir -p "$(dirname "$NQ_MARK")"
   : > "$NQ_MARK"
+  # KYU-NOCTALIA-SETUP: marca el wizard de bienvenida de Noctalia como ya hecho
+  mkdir -p "$HOME/.local/state/noctalia" && : > "$HOME/.local/state/noctalia/.setup-complete"
   # KYU-ENABLE-SDDM: el login grafico se habilita solo despues de desplegar el setup
   sudo systemctl enable sddm.service >/dev/null 2>&1 || true
   echo "Porphyx Linux: listo. Reinicia para entrar a la sesion grafica."
