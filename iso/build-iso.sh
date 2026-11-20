@@ -26,6 +26,11 @@ python3 "$HERE/gen-config.py" "$HERE" "$A/archinstall.json"
 cp -a "$HERE/overlay/." "$W/profile/"
 sed -i 's|^  \["/usr/local/bin/choose-mirror"\]="0:0:755"|&\n  ["/usr/local/bin/noctaliaq-install"]="0:0:755"|' "$W/profile/profiledef.sh"
 
+# KYU-ISO-MIRROR
+[[ -d "$HERE/mirror/core" ]] || { echo "ABORT: falta iso/mirror, corre iso/build-offline-mirror.sh"; exit 1; }
+mkdir -p "$W/profile/airootfs/opt/noctaliaq-mirror"
+cp -a "$HERE/mirror/." "$W/profile/airootfs/opt/noctaliaq-mirror/"
+
 # KYU-ISO-BRAND
 bash "$HERE/brand.sh" "$W/profile" "$REPO_DIR"
 sudo mkarchiso -v -w "$W/work" -o "$OUT" "$W/profile"

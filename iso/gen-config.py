@@ -32,6 +32,7 @@ cfg = {
     "network_config": {"type": "nm"},
     "mirror_config": {
         "optional_repositories": ["multilib"],
+        "custom_servers": [{"url": "file:///opt/noctaliaq-mirror/$repo/os/$arch"}],
         "custom_repositories": [
             {
                 "name": "noctaliaq",

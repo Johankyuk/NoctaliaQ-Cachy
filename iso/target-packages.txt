@@ -67,3 +67,4 @@ powerline-fonts
 vim
 # Sistema
 zram-generator
+fastfetch

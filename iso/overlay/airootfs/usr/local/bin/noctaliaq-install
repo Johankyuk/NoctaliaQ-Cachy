@@ -5,4 +5,4 @@ set -Eeuo pipefail
 setvtrgb /etc/noctaliaq-vtrgb 2>/dev/null || true
 G=$(python3 -c "import importlib.util as u; print(u.find_spec('archinstall').submodule_search_locations[0])")
 sed -i "s/title_text = 'Archlinux'/title_text = 'Porphyx Linux'/" "$G/scripts/guided.py" 2>/dev/null || true
-exec archinstall --plugin /opt/noctaliaq/plugin.py --config /opt/noctaliaq/archinstall.json "$@"
+exec archinstall --skip-ntp --skip-wkd --plugin /opt/noctaliaq/plugin.py --config /opt/noctaliaq/archinstall.json "$@"
