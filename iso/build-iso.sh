@@ -24,7 +24,7 @@ git -C "$REPO_DIR" archive --format=tar HEAD | tar -x -C "$A/src"
 # KYU-ISO-CFG
 python3 "$HERE/gen-config.py" "$HERE" "$A/archinstall.json"
 cp -a "$HERE/overlay/." "$W/profile/"
-sed -i 's|^  \["/usr/local/bin/choose-mirror"\]="0:0:755"|&\n  ["/usr/local/bin/noctaliaq-install"]="0:0:755"|' "$W/profile/profiledef.sh"
+sed -i 's|^  \["/usr/local/bin/choose-mirror"\]="0:0:755"|&\n  ["/usr/local/bin/porphyx-install"]="0:0:755"|' "$W/profile/profiledef.sh"
 
 # KYU-ISO-MIRROR
 [[ -d "$HERE/mirror/core" ]] || { echo "ABORT: falta iso/mirror, corre iso/build-offline-mirror.sh"; exit 1; }
