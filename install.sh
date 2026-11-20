@@ -326,7 +326,6 @@ done
 # KYU-CAVA-CONFIG: el template de noctalia exige que exista ~/.config/cava/config
 if [ ! -f "$HOME/.config/cava/config" ]; then
   mkdir -p "$HOME/.config/cava"
-  timeout 3 cava >/dev/null 2>&1 || true
   [ -f "$HOME/.config/cava/config" ] || printf '[general]\n' > "$HOME/.config/cava/config"
 fi
 # KYU-LAVAT
