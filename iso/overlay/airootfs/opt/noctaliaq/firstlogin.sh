@@ -11,6 +11,8 @@ echo "Porphyx Linux: primer inicio, desplegando el setup del repo (pedira tu con
 if (cd "$HOME/NoctaliaQ-Cachy" && bash ./install.sh); then
   mkdir -p "$(dirname "$NQ_MARK")"
   : > "$NQ_MARK"
+  # KYU-ENABLE-SDDM: el login grafico se habilita solo despues de desplegar el setup
+  sudo systemctl enable sddm.service >/dev/null 2>&1 || true
   echo "Porphyx Linux: listo. Reinicia para entrar a la sesion grafica."
 else
   echo "Porphyx Linux: install.sh fallo. Se reintenta en el proximo login (NOCTALIAQ_SKIP=1 lo omite)."
