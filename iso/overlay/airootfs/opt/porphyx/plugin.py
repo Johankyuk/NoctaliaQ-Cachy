@@ -5,36 +5,23 @@ from pathlib import Path
 
 SRC = Path("/opt/porphyx")
 
-
-def dedupe_section(path, name):
-    """Deja una sola seccion [name] en pacman.conf (archinstall la escribe en el live y otra vez en el destino)."""
-    lines = path.read_text().splitlines(keepends=True)
-    out = []
-    seen = False
-    skipping = False
-    for line in lines:
-        s = line.strip()
-        if s.startswith("[") and s.endswith("]"):
-            skipping = False
-            if s[1:-1] == name:
-                if seen:
-                    skipping = True
-                seen = True
-        if not skipping:
-            out.append(line)
-    path.write_text("".join(out))
+MOTD = (
+    "Porphyx Linux\n\n"
+    "Base instalada. Para instalar el escritorio (Umbriel, Noctalia, Luciole y greeter),\n"
+    "conectate a internet (nmtui) y ejecuta:\n\n"
+    "    porphyx setup\n\n"
+)
 
 
 class Plugin:
     def on_genfstab(self, installation):
         target = Path(installation.target)
-        shutil.copytree(SRC, target / "opt" / "porphyx", symlinks=True, dirs_exist_ok=True)
-        prof = target / "etc" / "profile.d"
-        prof.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(SRC / "firstlogin.sh", prof / "porphyx-firstlogin.sh")
-        conf = target / "etc" / "pacman.conf"
-        if conf.exists():
-            dedupe_section(conf, "porphyx")
+        bindir = target / "usr" / "local" / "bin"
+        bindir.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(SRC / "porphyx", bindir / "porphyx")
+        (bindir / "porphyx").chmod(0o755)
+        (target / "etc").mkdir(parents=True, exist_ok=True)
+        (target / "etc" / "motd").write_text(MOTD)
         issue = Path("/etc/issue")
         if issue.exists():
             shutil.copy2(issue, target / "etc" / "issue")
@@ -62,10 +49,4 @@ class Plugin:
             fcfg = fdest / "config.jsonc"
             if fcfg.exists():
                 fcfg.write_text(fcfg.read_text().replace("/root/.config/fastfetch/", "/etc/xdg/fastfetch/"))
-        mlist = target / "etc" / "pacman.d" / "mirrorlist"
-        if mlist.exists():
-            mold = mlist.read_text().splitlines(keepends=True)
-            mnew = [ln for ln in mold if "porphyx-mirror" not in ln]
-            if len(mnew) < len(mold):
-                mlist.write_text("".join(mnew))
         return None

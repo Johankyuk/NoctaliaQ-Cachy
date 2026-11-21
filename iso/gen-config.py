@@ -15,7 +15,7 @@ def read_list(name):
 
 
 pkgs = []
-for p in read_list("target-packages.txt") + read_list("aur-packages.txt"):
+for p in read_list("target-packages.txt"):
     if p not in pkgs and p not in ("base", "linux", "linux-firmware"):
         pkgs.append(p)
 
@@ -30,18 +30,7 @@ cfg = {
     "bootloader_config": {"bootloader": "Systemd-boot", "uki": False, "removable": False},
     "locale_config": {"kb_layout": "la-latin1", "sys_enc": "UTF-8", "sys_lang": "es_MX"},
     "network_config": {"type": "nm"},
-    "mirror_config": {
-        "optional_repositories": ["multilib"],
-        "custom_servers": [{"url": "file:///opt/porphyx-mirror/$repo/os/$arch"}],
-        "custom_repositories": [
-            {
-                "name": "porphyx",
-                "url": "file:///opt/porphyx/repo",
-                "sign_check": "Optional",
-                "sign_option": "TrustAll",
-            }
-        ]
-    },
+    "mirror_config": {"optional_repositories": ["multilib"]},
     "packages": pkgs,
     "services": ["bluetooth", "keyd", "switcheroo-control", "power-profiles-daemon", "upower"],
 }

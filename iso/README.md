@@ -1,14 +1,18 @@
 # iso/
 
-ISO de Arch (archiso) construida desde este mismo repo. El arbol git (HEAD) viaja dentro de la ISO en /opt/porphyx/src, asi que lo que se instala es lo que hay en el repo.
+ISO de Arch (archiso) con `porphyx-install` (archinstall modificado, online). Instala solo la base de Arch:
+kernel, firmware, red, drivers de GPU, audio y bluetooth. El escritorio no va en la ISO.
+
+Despues del primer reinicio, en la TTY: `porphyx setup` (ver `porphyx/`). Clona este repo y corre `install.sh`
+adaptado: Umbriel, Noctalia, Luciole y noctalia-greeter, con la GPU hibrida solo en ASUS TUF y preguntando.
 
 | Archivo | Que es |
 |---|---|
-| `aur-packages.txt` | Paquetes que no existen en Arch; se compilan al repo local |
-| `target-packages.txt` | Paquetes oficiales del sistema instalado |
+| `target-packages.txt` | Paquetes oficiales de la base instalada |
+| `gen-config.py` | Genera archinstall.json (teclado latam, hostname porphyx, systemd-boot) |
 | `check-packages.sh` | Verifica que target-packages.txt resuelva en Arch puro |
-| `build-local-repo.sh` | Compila aur-packages.txt en un chroot limpio y arma `repo/` |
 | `build-iso.sh` | Arma la ISO en `out/` |
+| `overlay/` | Archivos de la ISO: launcher porphyx-install, plugin de archinstall, motd, tema de consola |
 
-Orden: `check-packages.sh`, `build-local-repo.sh`, commitear, `build-iso.sh`.
-Estado: esqueleto. Falta el instalador dentro de la ISO y adaptar install.sh a Arch.
+Sin uso desde que la ISO es online: `aur-packages.txt`, `build-local-repo.sh`, `build-offline-mirror.sh`,
+`offline-extra-packages.txt`.

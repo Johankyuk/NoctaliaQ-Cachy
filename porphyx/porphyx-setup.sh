@@ -18,7 +18,8 @@ else
 fi
 
 echo "== Paquetes oficiales =="
-sudo pacman -Syu --needed --noconfirm base-devel git less xdg-utils desktop-file-utils noctalia noctalia-greeter greetd
+mapfile -t PKGS < <(sed "s/#.*//" "$HERE/official-packages.txt" | tr -s " \t" "\n" | grep -v "^$")
+sudo pacman -Syu --needed --noconfirm base-devel git less xdg-utils desktop-file-utils "${PKGS[@]}"
 
 echo "== AUR: Umbriel (PKGBUILD a revision, compila local) =="
 bash "$HERE/aur-install.sh" umbriel-git || die "umbriel-git no se instalo; sin el no hay sesion"

@@ -1,16 +1,13 @@
 #!/usr/bin/env bash
-# Arma la ISO: perfil releng de archiso + repo local + arbol git del repo (HEAD) en /opt/porphyx.
-# Requisitos: haber corrido build-local-repo.sh y tener todo commiteado (se copia HEAD, no el working tree).
+# Arma la ISO: perfil releng de archiso + instalador porphyx-install (online). El escritorio se instala despues con porphyx setup.
+# Requisito: tener todo commiteado (se copia porphyx/porphyx de HEAD, no del working tree).
 set -Eeuo pipefail
 trap 'echo "ERROR: linea $LINENO: $BASH_COMMAND" >&2' ERR
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "$HERE/.." && pwd)"
-REPO_OUT="$HERE/repo/x86_64"
 W="$HERE/work"
 OUT="$HERE/out"
 RELENG=/usr/share/archiso/configs/releng
-
-[[ -f "$REPO_OUT/porphyx.db" ]] || { echo "ABORT: falta el repo local, corre iso/build-local-repo.sh"; exit 1; }
 
 sudo rm -rf "$W"
 mkdir -p "$W" "$OUT"
@@ -18,18 +15,12 @@ cp -r "$RELENG" "$W/profile"
 sed -i 's|^iso_name=.*|iso_name="porphyx"|; s|^iso_application=.*|iso_application="Porphyx Linux Arch Live/Installer"|' "$W/profile/profiledef.sh"
 
 A="$W/profile/airootfs/opt/porphyx"
-mkdir -p "$A/repo" "$A/src"
-cp -a "$REPO_OUT/." "$A/repo/"
-git -C "$REPO_DIR" archive --format=tar HEAD | tar -x -C "$A/src"
+mkdir -p "$A"
+git -C "$REPO_DIR" archive --format=tar HEAD porphyx/porphyx | tar -x -C "$A" --strip-components=1
 # KYU-ISO-CFG
 python3 "$HERE/gen-config.py" "$HERE" "$A/archinstall.json"
 cp -a "$HERE/overlay/." "$W/profile/"
 sed -i 's|^  \["/usr/local/bin/choose-mirror"\]="0:0:755"|&\n  ["/usr/local/bin/porphyx-install"]="0:0:755"|' "$W/profile/profiledef.sh"
-
-# KYU-ISO-MIRROR
-[[ -d "$HERE/mirror/core" ]] || { echo "ABORT: falta iso/mirror, corre iso/build-offline-mirror.sh"; exit 1; }
-mkdir -p "$W/profile/airootfs/opt/porphyx-mirror"
-cp -a "$HERE/mirror/." "$W/profile/airootfs/opt/porphyx-mirror/"
 
 # KYU-ISO-BRAND
 bash "$HERE/brand.sh" "$W/profile" "$REPO_DIR"

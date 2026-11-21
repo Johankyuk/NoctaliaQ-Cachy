@@ -9,4 +9,4 @@ sed -i "s/title_text = 'Archlinux'/title_text = 'Porphyx Linux'/" "$G/scripts/gu
 echo "Preparando keyring del live..."
 for _ in $(seq 1 120); do systemctl is-active --quiet pacman-init.service && break; sleep 1; done
 systemctl is-active --quiet pacman-init.service || echo "AVISO: pacman-init no termino, el keyring del live puede no estar listo" >&2
-exec archinstall --skip-ntp --skip-wkd --offline --plugin /opt/porphyx/plugin.py --config /opt/porphyx/archinstall.json "$@"
+exec archinstall --skip-ntp --skip-wkd --plugin /opt/porphyx/plugin.py --config /opt/porphyx/archinstall.json "$@"

@@ -1,0 +1,7 @@
+# Oficiales de Arch que instala 'porphyx setup' (los de AUR van en porphyx-setup.sh).
+# Sesion, portales y fuentes
+greetd noctalia-greeter noctalia polkit xwayland-satellite xdg-desktop-portal xdg-desktop-portal-gtk xdg-desktop-portal-gnome gnome-keyring wl-clipboard adw-gtk-theme noto-fonts noto-fonts-emoji grim slurp
+# Apps y temas del repo
+foot nautilus papirus-icon-theme capitaine-cursors cava cmatrix playerctl mangohud flatpak
+# Zsh
+zsh zoxide eza fzf zsh-autosuggestions zsh-syntax-highlighting zsh-completions zsh-history-substring-search pkgfile powerline-fonts vim

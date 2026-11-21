@@ -25,46 +25,8 @@ pipewire-pulse
 wireplumber
 bluez
 bluez-utils
-# Entorno que install.sh da por instalado
-niri
-greetd
-noctalia-greeter
-noctalia
-polkit
-xwayland-satellite
-xdg-desktop-portal
-xdg-desktop-portal-gtk
-xdg-desktop-portal-gnome
-gnome-keyring
-wl-clipboard
-adw-gtk-theme
-noto-fonts
-noto-fonts-emoji
-grim
-slurp
-# Apps y temas del repo
-foot
-nautilus
-papirus-icon-theme
-capitaine-cursors
-cava
-cmatrix
-playerctl
-mangohud
-keyd
-flatpak
-# Zsh
-zsh
-zoxide
-eza
-fzf
-zsh-autosuggestions
-zsh-syntax-highlighting
-zsh-completions
-zsh-history-substring-search
-pkgfile
-powerline-fonts
-vim
 # Sistema
 zram-generator
 fastfetch
+# Teclado (servicio keyd)
+keyd
