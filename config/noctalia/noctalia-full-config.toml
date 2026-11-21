@@ -775,8 +775,6 @@ type = "active_window"
 
 [widget.audio_vis]
 bands = 20
-high_color = "secondary"
-low_color = "primary"
 show_when_idle = true
 type = "audio_visualizer"
 width = 64
