@@ -10,7 +10,7 @@ sin asusctl, sin supergfxctl, sin optimus-manager. Solo sysfs, udev, polkit y sy
 | CPU (EPP, governor) y `platform_profile` | **power-profiles-daemon** — este módulo no lo toca |
 | Curvas de ventilador CPU/GPU | `noctaliaq-power` |
 | Relojes / runtime PM de la dGPU | `noctaliaq-power` |
-| Híbrido ↔ integrado | `noctaliaq-gpu-mode` |
+| dGPU (encender y apagar) | `noctaliaq-gpu-prime` y `noctaliaq-dgpu` (ver `gpu-setup/`); siempre híbrida, sin cambio de modo |
 | MUX / modo "ultimate" | **fuera de alcance a propósito** (exige reboot por ACPI y puede dejarte sin video) |
 
 La regla de oro es no pelear con PPD. Noctalia cambia el perfil → PPD ajusta CPU y
@@ -79,12 +79,8 @@ que es justo lo que reintroduce el acordeón.
 | Ruta | Qué es |
 |---|---|
 | `/usr/local/bin/noctaliaq-power` | aplica curvas + política de dGPU; `apply`, `gaming on\|off`, `status`, `reset` |
-| `/usr/local/bin/noctaliaq-gpu-mode` | `status`, `hybrid`, `integrated` (`--persist`, `--at-boot`) |
 | `/etc/noctaliaq/power.conf` | las curvas y los límites de GPU |
 | `/etc/udev/rules.d/60-noctaliaq-hwaccess.rules` | da escritura a `wheel` sobre hwmon y `power/control` |
-| `/usr/share/polkit-1/actions/org.noctaliaq.gpu-mode.policy` | acción polkit del switch de GPU |
-| `/etc/polkit-1/rules.d/49-noctaliaq-gpu-mode.rules` | opcional: sin contraseña para `wheel` local y activo |
-| `/etc/systemd/system/noctaliaq-gpu-mode.service` | reaplica el modo integrado en el arranque |
 | `/usr/lib/systemd/system-sleep/noctaliaq-power-resume` | reaplica la curva al despertar |
 
 Los binarios van a `/usr/local/bin` y no a `~/.local/bin` porque greetd lanza niri vía
@@ -104,20 +100,17 @@ placeholder `HOME/`).
 
 noctaliaq-power status
 noctaliaq-power gaming on
-noctaliaq-gpu-mode status
-noctaliaq-gpu-mode integrated --persist
 ```
 
 ## En el launcher
 
-`install-gaming-mode.sh` despliega cuatro entradas en
+`install-gaming-mode.sh` despliega tres entradas en
 `~/.local/share/applications/`, que es de donde el launcher de Noctalia lee:
 
 | Entrada | Qué hace | Acciones (clic derecho) |
 |---|---|---|
 | Modo Gaming | alterna el modo con un clic | Activar / Desactivar |
 | Estado térmico y de energía | perfil, curvas vivas y dGPU | Reaplicar curvas / Ventiladores en automático |
-| Modo de gráficos | estado de la GPU | Cambiar a híbrido / Cambiar a solo iGPU |
 | Asistente gaming-mode | reinstala o diagnostica | Solo diagnosticar |
 
 Las acciones de clic derecho requieren `show_app_actions` activo en el launcher
@@ -153,14 +146,8 @@ reporta; el módulo no lo toca.
 
 ## Limitaciones conocidas
 
-- **El modo integrado en caliente casi nunca funciona con la sesión abierta.** Si niri,
-  Xwayland o cualquier proceso tiene abierto un `/dev/nvidia*`, `modprobe -r` falla. El
-  script te dice exactamente quién lo retiene y te ofrece `--at-boot`. Desde un TTY
-  (Ctrl+Alt+F2, sin sesión gráfica) sí funciona en caliente.
 - **`nvidia-smi -pl` suele estar bloqueado en GPU móviles.** `--probe` te dice si tu
   4050 reporta rango min/max; si no, deja `NV_PL_*` vacío y usa `NV_LGC_*`.
-- **Si `mkinitcpio.conf` tiene `nvidia` en `MODULES=`**, los módulos se cargan a la
-  fuerza desde el initramfs y la blacklist no los detiene. `--probe` lo avisa.
 - **`dgpu_disable` no está en todos los TUF.** Si falta, se cae a `remove` + `rescan`
   del bus PCI, que funciona pero es más brusco y a veces necesita dos intentos.
 - La curva se pierde si algo más escribe `platform_profile` sin pasar por PPD. El hook
@@ -171,7 +158,6 @@ reporta; el módulo no lo toca.
 ```bash
 noctaliaq-power status                       # modo de cada fan + los 8 puntos vivos
 journalctl -t noctaliaq-power -b --no-pager  # qué aplicó y cuándo
-journalctl -t noctaliaq-gpu-mode -b --no-pager
 watch -n1 'sensors | grep -iE "fan|tctl|edge"'
 ```
 

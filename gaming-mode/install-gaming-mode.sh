@@ -151,10 +151,6 @@ probe() {
         || info "sin relojes soportados reportados: -lgc puede fallar"
     fi
   fi
-  if grep -qE '^MODULES=.*nvidia' /etc/mkinitcpio.conf 2>/dev/null; then
-    warn "mkinitcpio.conf tiene nvidia en MODULES=: el modo integrado persistente"
-    warn "no funcionará hasta quitarlos de ahí y correr 'sudo mkinitcpio -P'"
-  fi
 
   head2 "Noctalia"
   command -v noctalia >/dev/null 2>&1 && ok "binario noctalia presente" || warn "no encontré 'noctalia' en PATH"
@@ -170,7 +166,6 @@ probe() {
 install_all() {
   head2 "Binarios"
   backup_and_copy "$SELF_DIR/bin/noctaliaq-power"    /usr/local/bin/noctaliaq-power    0755
-  backup_and_copy "$SELF_DIR/bin/noctaliaq-gpu-mode" /usr/local/bin/noctaliaq-gpu-mode 0755
   backup_and_copy "$SELF_DIR/bin/noctaliaq-hold"     /usr/local/bin/noctaliaq-hold     0755
   info "van a /usr/local/bin y no a ~/.local/bin a propósito: greetd lanza niri por"
   info "PAM y ~/.local/bin nunca entra en el PATH heredado."
@@ -198,23 +193,10 @@ install_all() {
       || warn "pwm1_enable sigue sin permiso de escritura; revisa 'udevadm test'"
   fi
 
-  head2 "Switch de GPU (polkit)"
-  backup_and_copy "$SELF_DIR/system/org.noctaliaq.gpu-mode.policy" \
-                  /usr/share/polkit-1/actions/org.noctaliaq.gpu-mode.policy 0644
-  if ask "¿instalar la regla que evita el prompt de contraseña (wheel + sesión local activa)?" n; then
-    backup_and_copy "$SELF_DIR/system/49-noctaliaq-gpu-mode.rules" \
-                    /etc/polkit-1/rules.d/49-noctaliaq-gpu-mode.rules 0644
-  else
-    info "sin regla: pkexec pedirá contraseña (auth_admin_keep, la recuerda un rato)"
-  fi
-
   head2 "Persistencia"
-  backup_and_copy "$SELF_DIR/system/noctaliaq-gpu-mode.service" \
-                  /etc/systemd/system/noctaliaq-gpu-mode.service 0644
   backup_and_copy "$SELF_DIR/system/noctaliaq-power-resume" \
                   /usr/lib/systemd/system-sleep/noctaliaq-power-resume 0755
   sudo systemctl daemon-reload || die "daemon-reload falló"
-  info "la unidad se habilita sola cuando uses 'noctaliaq-gpu-mode integrated --persist'"
 
   head2 "Entradas del launcher"
   install_desktop
@@ -226,6 +208,7 @@ install_all() {
 install_desktop() {
   local dir="$HOME/.local/share/applications" f name
   mkdir -p "$dir" || die "no pude crear $dir"
+  rm -f "$dir/noctaliaq-gpu-mode.desktop"   # entrada vieja (el cambio de modo ya no existe)
   for f in "$SELF_DIR"/desktop/*.desktop; do
     [[ -r "$f" ]] || die "no hay plantillas .desktop en $SELF_DIR/desktop/"
     name="${f##*/}"
@@ -328,16 +311,13 @@ PY
 verify() {
   head2 "Verificación"
   local p
-  for p in /usr/local/bin/noctaliaq-power /usr/local/bin/noctaliaq-gpu-mode \
+  for p in /usr/local/bin/noctaliaq-power \
            /etc/noctaliaq/power.conf /etc/udev/rules.d/60-noctaliaq-hwaccess.rules \
-           /usr/share/polkit-1/actions/org.noctaliaq.gpu-mode.policy \
-           /etc/systemd/system/noctaliaq-gpu-mode.service \
            /usr/lib/systemd/system-sleep/noctaliaq-power-resume; do
     sudo test -e "$p" || die "falta $p"
   done
   ok "todos los archivos en su sitio"
   bash -n /usr/local/bin/noctaliaq-power    || die "noctaliaq-power tiene error de sintaxis"
-  bash -n /usr/local/bin/noctaliaq-gpu-mode || die "noctaliaq-gpu-mode tiene error de sintaxis"
   ok "sintaxis de los scripts correcta"
   # buscar el comando, no el nombre de la clave: un array vacío también matchea
   local n
@@ -348,7 +328,7 @@ verify() {
     die "solo $n de 2 hooks en config.toml o zz-noctaliaq.toml — la sincronía no quedaría activa"
   fi
   n="$(command ls "$HOME/.local/share/applications"/noctaliaq-*.desktop 2>/dev/null | wc -l)"
-  [[ "$n" -ge 4 ]] && ok "$n entradas en el launcher" || warn "solo $n entradas .desktop"
+  [[ "$n" -ge 3 ]] && ok "$n entradas en el launcher" || warn "solo $n entradas .desktop"
 }
 
 uninstall_all() {
@@ -395,12 +375,6 @@ Listo. Atajos sugeridos para keybinds.kdl:
 
     Mod+Shift+G { spawn "noctaliaq-power" "gaming" "on"; }
     Mod+Shift+N { spawn "noctaliaq-power" "gaming" "off"; }
-
-Cambiar de GPU (cierra sesión primero para el modo integrado):
-
-    noctaliaq-gpu-mode status
-    noctaliaq-gpu-mode integrated --persist
-    noctaliaq-gpu-mode hybrid --persist
 
 Las curvas están en /etc/noctaliaq/power.conf. Tras editarlas:
 
