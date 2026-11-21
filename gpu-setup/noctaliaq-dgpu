@@ -6,7 +6,8 @@
 #                  cuando nadie la use. El ahorro real depende del driver y del firmware del equipo.
 #   none           sin mecanismo: sale con 2 y el llamador sigue solo con estado.
 # Corre como root: via pkexec (accion polkit org.noctaliaq.dgpu) o desde noctaliaq-dgpu-boot.service.
-#   off | on | status | backend (imprime el backend elegido)
+#   off | on | release | status | backend (imprime el backend elegido)
+# release: al apagar el equipo deja dgpu_disable=0 para que otro sistema vea la dGPU.
 # Con firmware-asus, off sale con 3 sin tocar nada si algo usa la dGPU.
 # Requiere niri con ignore-drm-device sobre la dGPU; si niri la abre, el apagado siempre da 3.
 set -uo pipefail
@@ -94,6 +95,22 @@ rpm_on() {
   log "runtime-pm: dGPU disponible (auto)"
 }
 
+# --- liberar al apagar (para otros sistemas operativos) ------------------------
+# El firmware ASUS conserva dgpu_disable entre apagados: si queda en 1, otra distro
+# o Windows arrancan sin dGPU. 'release' solo escribe 0 (no toca el bus ni los modulos);
+# este sistema la vuelve a apagar en el siguiente arranque con 'off'.
+fw_release() {
+  echo 0 > $G
+  log "dGPU liberada (dgpu_disable=0): el siguiente sistema la vera"
+}
+rel() {
+  local st=${NOCTALIAQ_STATE_DIR:-/var/lib/noctaliaq} etc=${NOCTALIAQ_ETC:-/etc/noctaliaq}
+  if [[ -s $st/gpu-mode-intent ]] || grep -qi integra "$etc/gpu-mode" 2>/dev/null; then
+    log "release omitido: modo Integrada elegido a proposito (gaming-mode)"; exit 0
+  fi
+  if [[ $B == firmware-asus ]]; then fw_release; else log "release: sin cambio ($B no persiste nada)"; fi
+}
+
 # --- eleccion de backend ------------------------------------------------------
 detect() {
   case "$BACKEND" in firmware-asus|runtime-pm|none) echo "$BACKEND"; return ;; esac
@@ -114,5 +131,6 @@ case "${1:-}" in
   status) if [[ $B == firmware-asus ]]; then fw_status; else rpm_status; fi ;;
   off)    if [[ $B == firmware-asus ]]; then fw_off; else rpm_off; fi ;;
   on)     if [[ $B == firmware-asus ]]; then fw_on; else rpm_on; fi ;;
-  *) echo "uso: noctaliaq-dgpu [on|off|status|backend]" >&2; exit 1 ;;
+  release) rel ;;
+  *) echo "uso: noctaliaq-dgpu [on|off|release|status|backend]" >&2; exit 1 ;;
 esac

@@ -6,7 +6,7 @@ Before=display-manager.service greetd.service
 Type=oneshot
 ExecStart=/usr/local/bin/noctaliaq-dgpu off
 RemainAfterExit=yes
-ExecStop=-/usr/local/bin/noctaliaq-dgpu off
+ExecStop=-/usr/local/bin/noctaliaq-dgpu release
 TimeoutStopSec=20
 [Install]
 WantedBy=multi-user.target

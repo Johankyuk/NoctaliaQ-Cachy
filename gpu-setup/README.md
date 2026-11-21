@@ -7,7 +7,7 @@ Control de la dGPU en portátiles con GPU híbrida. `install.sh` lo despliega co
 |---|---|
 | `deploy-dgpu.sh` | Instalador. Requiere root y es idempotente. Deja `nvidia-powerd` deshabilitado al arranque |
 | `noctaliaq-dgpu` | Enciende o apaga la dGPU con el mejor backend disponible: `firmware-asus` (la quita del bus PCI y la corta por firmware; `off` verifica que nadie la use) o `runtime-pm` (genérico: deja el runtime PM en `auto`, mejor esfuerzo, sin probar fuera de ASUS). `noctaliaq-dgpu backend` imprime el elegido y se puede forzar con `BACKEND=` en `/etc/noctaliaq/dgpu.conf`. Corre como root vía pkexec o desde el servicio de arranque |
-| `noctaliaq-dgpu-boot.service` | Servicio de sistema que apaga la dGPU al arrancar y otra vez al apagar el equipo, para que el siguiente arranque empiece sin dGPU (cachyos-drm-awaiter falla si la ve al inicio y nvidia no carga) |
+| `noctaliaq-dgpu-boot.service` | Servicio de sistema que apaga la dGPU al arrancar y al apagar el equipo la libera (`dgpu_disable=0`) para que otro sistema la vea (cachyos-drm-awaiter falla si la ve al inicio y nvidia no carga) |
 | `org.noctaliaq.dgpu.policy` | Acción polkit `org.noctaliaq.dgpu` para usar pkexec sin contraseña de root |
 | `49-noctaliaq-dgpu.rules` | Regla polkit; `deploy-dgpu.sh` la instala en `/etc/polkit-1/rules.d/` |
 
