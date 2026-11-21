@@ -1,0 +1,1 @@
+# paquete commit  (opcional). Sin pin se compila el HEAD del AUR, tras revisar el PKGBUILD.

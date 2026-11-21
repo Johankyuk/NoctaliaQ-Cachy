@@ -243,19 +243,40 @@ fi
 
 systemctl --user daemon-reload
 
+# KYU-GPU-ASK
+# Solo en Porphyx (PORPHYX=1): la parte de GPU hibrida es WIP y solo se ofrece en ASUS TUF.
+GPU_SETUP=si
+if [ -n "${PORPHYX:-}" ]; then
+  GPU_SETUP=no
+  _pn=$(cat /sys/class/dmi/id/product_name 2>/dev/null || true)
+  if [[ "$_pn" == *TUF* ]] && [ -d /sys/devices/platform/asus-nb-wmi ]; then
+    echo "== GPU hibrida (ASUS TUF, WIP) =="
+    echo "Ahorro de la dGPU, PRIME offload, gaming-mode y curvas de ventilador."
+    if [ -n "${PORPHYX_GPU:-}" ]; then _r="$PORPHYX_GPU"
+    elif [ -r /dev/tty ]; then read -r -p "Instalar la parte de GPU hibrida ahora? [s/N] " _r </dev/tty
+    else _r=n; fi
+    case "$_r" in s|S|y|Y|si) GPU_SETUP=si ;; esac
+  else
+    echo "GPU hibrida: solo disponible en ASUS TUF por ahora (WIP), se omite."
+  fi
+fi
+
 # dGPU: sesion siempre arranca en ahorro (estado offload off, gamer mode off).
 # Encendido en caliente al conectar AC (hooks battery_*) o con Mod+Alt+G.
 backup_and_copy "$REPO_DIR/config/systemd-user/noctaliaq-gpu-boot.service" "$HOME/.config/systemd/user/noctaliaq-gpu-boot.service"
 systemctl --user daemon-reload
-systemctl --user enable noctaliaq-gpu-boot.service
+if [ "$GPU_SETUP" = si ]; then systemctl --user enable noctaliaq-gpu-boot.service; fi
 
 # Zen con EGL de Mesa: sin esto su proceso de video abre la NVIDIA y bloquea el apagado.
 backup_and_copy "$REPO_DIR/config/applications/zen.desktop" "$HOME/.local/share/applications/zen.desktop"
 update-desktop-database "$HOME/.local/share/applications" 2>/dev/null || true
 
 # Apagado fisico de la dGPU (solo laptops ASUS con dgpu_disable). Requiere root.
-if [[ -e /sys/devices/platform/asus-nb-wmi/dgpu_disable ]]; then
+if [ "$GPU_SETUP" = si ] && [[ -e /sys/devices/platform/asus-nb-wmi/dgpu_disable ]]; then
     sudo "$REPO_DIR/gpu-setup/deploy-dgpu.sh" || echo "AVISO: deploy-dgpu.sh fallo"
+fi
+if [ -n "${PORPHYX:-}" ] && [ "$GPU_SETUP" = si ]; then
+    bash "$REPO_DIR/gaming-mode/install-gaming-mode.sh" || echo "AVISO: install-gaming-mode.sh fallo"
 fi
 
 

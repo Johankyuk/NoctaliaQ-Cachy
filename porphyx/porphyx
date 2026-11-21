@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# porphyx — comando del sistema. Uso: porphyx setup
+set -Eeuo pipefail
+REPO_URL=https://github.com/Johankyuk/NoctaliaQ-Cachy
+REPO_DIR="${PORPHYX_REPO:-$HOME/NoctaliaQ-Cachy}"
+case "${1:-help}" in
+  setup)
+    [ "$(id -u)" -ne 0 ] || { echo "No corras porphyx setup como root: usa tu usuario (pide sudo cuando haga falta)." >&2; exit 1; }
+    if [ -f "$REPO_DIR/install.sh" ]; then
+      echo "Usando el repo existente: $REPO_DIR"
+    else
+      command -v git >/dev/null 2>&1 || sudo pacman -S --needed --noconfirm git
+      git clone --depth 1 "$REPO_URL" "$REPO_DIR"
+    fi
+    [ -f "$REPO_DIR/porphyx/porphyx-setup.sh" ] || { echo "ERROR: falta porphyx/porphyx-setup.sh en $REPO_DIR" >&2; exit 1; }
+    exec bash "$REPO_DIR/porphyx/porphyx-setup.sh" "${@:2}"
+    ;;
+  *)
+    echo "uso: porphyx setup"
+    ;;
+esac

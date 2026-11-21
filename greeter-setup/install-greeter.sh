@@ -21,7 +21,7 @@ echo "Corriendo setup del sistema para noctalia-greeter..."
 sudo /usr/share/noctalia-greeter/setup_greeter_system.sh
 
 echo "Deshabilitando SDDM, habilitando greetd..."
-sudo systemctl disable --now sddm.service
+sudo systemctl disable --now sddm.service 2>/dev/null || true
 sudo systemctl enable greetd.service
 
 echo "Listo. Reiniciá para probar."
