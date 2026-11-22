@@ -23,6 +23,17 @@ for p in "$@"; do
     read -r -p "Compilar e instalar $p? [S/n] " r </dev/tty
     case "${r:-s}" in n|N) echo "omitido: $p"; rc=1; continue ;; esac
   fi
+  # dependencias que solo existen en el AUR: se instalan primero (cada una muestra su PKGBUILD)
+  if [ -f "$d/.SRCINFO" ] && [ "${PORPHYX_AUR_DEPTH:-0}" -lt 4 ]; then
+    deps="$(sed -n -E 's/^[[:space:]]*(depends|makedepends|checkdepends)(_[a-z0-9_]+)? = ([^<>=[:space:]]+).*/\3/p' "$d/.SRCINFO" | sort -u)"
+    for dep in $deps; do
+      pacman -T "$dep" >/dev/null 2>&1 && continue
+      pacman -Sp "$dep" >/dev/null 2>&1 && continue
+      echo "$p necesita $dep (solo AUR)"
+      case ",${PORPHYX_AUR_STACK:-}," in *",$dep,"*) echo "ERROR: dependencia circular con $dep" >&2; rc=1; continue 2 ;; esac
+      PORPHYX_AUR_STACK="${PORPHYX_AUR_STACK:-},$p" PORPHYX_AUR_DEPTH=$(( ${PORPHYX_AUR_DEPTH:-0} + 1 )) bash "$HERE/aur-install.sh" "$dep" || { echo "ERROR: la dependencia $dep de $p no se instalo" >&2; rc=1; continue 2; }
+    done
+  fi
   ( cd "$d" && makepkg -si --needed --noconfirm ) || { echo "ERROR: makepkg fallo en $p" >&2; rc=1; continue; }
 done
 exit $rc
